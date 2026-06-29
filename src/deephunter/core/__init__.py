@@ -13,13 +13,18 @@ from deephunter.core.exceptions import (
     TrainingError,
 )
 from deephunter.core.types import (
+    AttackSurfaceEntry,
     AuthMechanism,
+    AuthorizationModel,
     BugClass,
+    BusinessLogicConcern,
     CloudProvider,
     Confidence,
     DocumentType,
     Framework,
+    ManualTestChecklistItem,
     Metadata,
+    PayloadReference,
     RelatedReference,
     SourceType,
     Technology,
@@ -50,4 +55,9 @@ __all__ = [
     "TestingIdea",
     "RelatedReference",
     "Metadata",
+    "AttackSurfaceEntry",
+    "AuthorizationModel",
+    "BusinessLogicConcern",
+    "ManualTestChecklistItem",
+    "PayloadReference",
 ]

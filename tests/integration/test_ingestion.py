@@ -8,6 +8,7 @@ import pytest
 
 from deephunter.core.types import BugClass, CloudProvider, SourceType, Technology
 from deephunter.ingestion.extractor import MetadataExtractor
+from deephunter.ingestion.extractor import MetadataExtractor
 from deephunter.ingestion.pipeline import IngestionPipeline
 from deephunter.knowledge.store import KnowledgeStore
 from deephunter.parsers.base import ParserRegistry
@@ -91,7 +92,7 @@ class TestIngestionPipeline:
         pipeline = IngestionPipeline(sample_config, KnowledgeStore(), parser_registry=parser_registry)
         sko = pipeline.parse_single(str(file_path))
 
-        assert sko.title == "sqli"
+        assert sko.title == "SQL Injection Testing"
         assert "SQL injection" in sko.summary
         assert BugClass.SQL_INJECTION in sko.bug_classes
 
@@ -113,6 +114,6 @@ class TestIngestionPipeline:
         pipeline = IngestionPipeline(sample_config, store, parser_registry=parser_registry)
         # Add a watch directory that doesn't exist
         sample_config.ingestion.watch_directories = ["/nonexistent"]
-        results = pipeline.run()
-        assert results["total"] == 0
-        assert results["stored"] == 0
+        report = pipeline.run()
+        assert report.total == 0
+        assert report.stored == 0

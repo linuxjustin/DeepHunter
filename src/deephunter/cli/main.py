@@ -9,6 +9,7 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
 from deephunter.core.config import DeepHunterConfig
@@ -59,31 +60,87 @@ def cli(ctx: click.Context, config: str, log_level: str | None) -> None:
 
 
 @cli.command()
-@click.argument("directories", nargs=-1, type=click.Path(exists=True))
+@click.argument("paths", nargs=-1, type=click.Path(exists=True))
+@click.option("--recursive/--no-recursive", default=None, help="Scan directories recursively")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format for results",
+)
 @click.pass_context
-def ingest(ctx: click.Context, directories: tuple[str, ...]) -> None:
+def ingest(
+    ctx: click.Context,
+    paths: tuple[str, ...],
+    recursive: bool | None,
+    fmt: str,
+) -> None:
     """Ingest knowledge documents into the store.
 
-    Scans the given directories (or the configured data directory)
-    for supported document files, parses them, and stores them as SKOs.
+    Scans the given paths (file or directory) for supported documents,
+    parses them, and stores them as SKOs.
     """
     config: DeepHunterConfig = ctx.obj["config"]
     store: KnowledgeStore = ctx.obj["store"]
 
     pipeline = IngestionPipeline(config, store)
-    dirs = list(directories) if directories else None
-    results = pipeline.run(directories=dirs)
+    input_paths = list(paths) if paths else None
 
-    table = Table(title="Ingestion Results")
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=40),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Ingesting documents...", total=None)
+
+        report = pipeline.run(paths=input_paths, recursive=recursive)
+
+        progress.update(task, total=report.total, completed=report.total)
+
+    if fmt == "json":
+        import json
+
+        console.print(json.dumps({
+            "total": report.total,
+            "parsed": report.stored,
+            "skipped": report.skipped,
+            "duplicates": report.duplicates,
+            "failed": report.failed,
+            "elapsed_seconds": report.elapsed_seconds,
+            "errors": [
+                {"path": str(e.path), "error": e.error}
+                for e in report.errors
+            ],
+        }, indent=2))
+        return
+
+    console.print()
+    table = Table(title="Ingestion Results", title_style="bold green")
     table.add_column("Metric", style="cyan")
     table.add_column("Count", style="green")
 
-    table.add_row("Total files found", str(results["total"]))
-    table.add_row("Successfully parsed", str(results["parsed"]))
-    table.add_row("Stored as SKOs", str(results["stored"]))
-    table.add_row("Skipped", str(results["skipped"]))
+    table.add_row("Total files found", str(report.total))
+    table.add_row("Successfully parsed", str(report.stored))
+    table.add_row("Skipped (no parser / error)", str(report.skipped))
+    table.add_row("Duplicates skipped", str(report.duplicates))
+    table.add_row("Failed", str(report.failed))
+    table.add_row("Validation failures", str(report.validation.failed))
+    table.add_row("Elapsed time", f"{report.elapsed_seconds:.2f}s")
 
     console.print(table)
+
+    if report.errors:
+        error_table = Table(title="Errors", title_style="bold red")
+        error_table.add_column("File", style="red")
+        error_table.add_column("Error", style="red")
+        for err in report.errors:
+            error_table.add_row(str(err.path), err.error or "")
+        console.print(error_table)
 
 
 @cli.command()
@@ -145,7 +202,6 @@ def get_sko(ctx: click.Context, sko_id: str) -> None:
     sko = store.get(sko_id)
 
     if sko is None:
-        # Try prefix match
         matches = [s for s in store.list_all() if s.id.startswith(sko_id)]
         if not matches:
             console.print(f"[red]SKO not found: {sko_id}[/red]")

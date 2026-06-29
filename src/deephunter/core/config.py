@@ -33,6 +33,52 @@ class ParserConfig(BaseSettings):
     )
 
 
+class DiscoveryConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+    recursive: bool = Field(
+        default=True, description="Scan directories recursively"
+    )
+    follow_symlinks: bool = Field(
+        default=False, description="Follow symbolic links"
+    )
+    exclude_patterns: list[str] = Field(
+        default_factory=list,
+        description="Glob patterns to exclude from discovery",
+    )
+
+
+class DedupConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+    enabled: bool = Field(default=True, description="Enable deduplication")
+    strategy: str = Field(
+        default="content_hash",
+        description="Deduplication strategy: 'content_hash' or 'none'",
+    )
+    require_all: bool = Field(
+        default=False,
+        description="Require all strategies to agree before flagging duplicate",
+    )
+
+
+class StorageConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+    backend: str = Field(
+        default="sqlite",
+        description="Storage backend: 'sqlite' or 'json'",
+    )
+    json_path: str = Field(
+        default="./knowledge/skos",
+        description="Base directory for JSON store (used when backend='json')",
+    )
+    sqlite_path: str | None = Field(
+        default=None,
+        description="SQLite database path (None = default ~/.deephunter/store.db)",
+    )
+
+
 class IngestionConfig(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
@@ -42,6 +88,9 @@ class IngestionConfig(BaseSettings):
     )
     batch_size: int = Field(default=10, ge=1, le=1000)
     deduplicate: bool = Field(default=True)
+    discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
+    dedup: DedupConfig = Field(default_factory=DedupConfig)
+    storage: StorageConfig = Field(default_factory=StorageConfig)
 
 
 class RAGConfig(BaseSettings):
