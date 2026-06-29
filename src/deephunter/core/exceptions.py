@@ -29,6 +29,10 @@ class ReasoningError(DeepHunterError):
     """Raised when hypothesis generation fails."""
 
 
+class InvestigationError(DeepHunterError):
+    """Raised when an investigation operation fails."""
+
+
 class EvaluationError(DeepHunterError):
     """Raised when evaluation of results fails."""
 
