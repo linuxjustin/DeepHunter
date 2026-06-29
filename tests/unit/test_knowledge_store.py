@@ -15,7 +15,7 @@ class TestKnowledgeStore:
     def test_count_empty(self, empty_store) -> None:
         assert empty_store.count() == 0
 
-    def _make_sko(self, title: str, source: str = "test") -> SecurityKnowledgeObject:
+    def _make_sko(self, title: str, source: str = "https://test.com") -> SecurityKnowledgeObject:
         return SecurityKnowledgeObject(title=title, source=source)
 
     def test_add_and_count(self, empty_store) -> None:
@@ -74,16 +74,16 @@ class TestKnowledgeStore:
 
     def test_add_batch(self, empty_store) -> None:
         skos = [
-            self._make_sko("A", "a"),
-            self._make_sko("B", "b"),
-            self._make_sko("C", "c"),
+            self._make_sko("A", "https://test.com/a"),
+            self._make_sko("B", "https://test.com/b"),
+            self._make_sko("C", "https://test.com/c"),
         ]
         ids = empty_store.add_batch(skos)
         assert len(ids) == 3
         assert empty_store.count() == 3
 
     def test_add_batch_collision(self, empty_store) -> None:
-        sko = self._make_sko("A", "a")
+        sko = self._make_sko("A", "https://test.com/a")
         empty_store.add(sko)
         with pytest.raises(StorageError, match="already exists"):
             empty_store.add_batch([sko])

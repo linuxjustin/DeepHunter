@@ -173,3 +173,59 @@ class Metadata(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class AttackSurfaceEntry(BaseModel):
+    """An attack surface entry point in the target application."""
+
+    name: str = Field(description="Human-readable name, e.g. 'Login endpoint'")
+    description: str = Field(default="", description="What this entry point does")
+    protocol: str = Field(default="https", description="Protocol (http, https, ws, etc.)")
+    method: str = Field(default="", description="HTTP method if applicable (GET, POST, etc.)")
+    path: str = Field(default="", description="URL path pattern, e.g. '/api/v1/login'")
+    parameters: list[str] = Field(default_factory=list, description="Parameters accepted")
+    authentication_required: bool = Field(default=True)
+    authorization_required: bool = Field(default=True)
+    bug_classes: list[str] = Field(default_factory=list)
+
+
+class BusinessLogicConcern(BaseModel):
+    """A business logic concern or flaw pattern."""
+
+    description: str = Field(description="What the business logic does")
+    impact: str = Field(default="", description="Potential security impact")
+    attack_scenario: str = Field(default="", description="How this could be exploited")
+    complexity: str = Field(default="medium", description="low, medium, high")
+    requires_authentication: bool = Field(default=True)
+
+
+class AuthorizationModel(BaseModel):
+    """Describes an authorization check or model."""
+
+    model_type: str = Field(description="Type, e.g. 'RBAC', 'ABAC', 'ACL', 'ownership'")
+    description: str = Field(default="", description="How authorization works")
+    roles: list[str] = Field(default_factory=list, description="Relevant roles")
+    permissions: list[str] = Field(default_factory=list, description="Relevant permissions")
+    bypass_scenarios: list[str] = Field(default_factory=list)
+
+
+class ManualTestChecklistItem(BaseModel):
+    """A single manual test step for a penetration testing checklist."""
+
+    step_id: str = Field(default="", description="Checklist item identifier")
+    category: str = Field(default="", description="Category, e.g. 'Authentication', 'Input Validation'")
+    description: str = Field(description="What to test")
+    expected_result: str = Field(default="", description="What a successful test looks like")
+    tools: list[str] = Field(default_factory=list, description="Recommended tools")
+    references: list[str] = Field(default_factory=list)
+
+
+class PayloadReference(BaseModel):
+    """A reference to a specific payload for testing."""
+
+    payload: str = Field(description="The actual payload string")
+    description: str = Field(default="", description="What this payload tests")
+    bug_classes: list[str] = Field(default_factory=list)
+    source: str = Field(default="", description="Where this payload was found")
+    encoding: str = Field(default="raw", description="Encoding: raw, url, base64, etc.")
+    effectiveness: str = Field(default="unknown", description="How often it works: low, medium, high, unknown")

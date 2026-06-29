@@ -21,8 +21,10 @@ logger = get_logger(__name__)
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS skos (
     id TEXT PRIMARY KEY,
+    schema_version INTEGER DEFAULT 1,
     title TEXT NOT NULL,
     summary TEXT DEFAULT '',
+    description TEXT DEFAULT '',
     source TEXT NOT NULL,
     source_type TEXT DEFAULT 'other',
     document_type TEXT DEFAULT 'unknown',
@@ -33,20 +35,28 @@ CREATE TABLE IF NOT EXISTS skos (
     technology TEXT DEFAULT '[]',
     framework TEXT DEFAULT '[]',
     language TEXT DEFAULT '[]',
+    operating_system TEXT DEFAULT '[]',
     cloud_provider TEXT DEFAULT '[]',
     bug_classes TEXT DEFAULT '[]',
     authentication TEXT DEFAULT '[]',
+    authorization TEXT DEFAULT '[]',
     trust_boundaries TEXT DEFAULT '[]',
+    business_logic TEXT DEFAULT '[]',
+    attack_surface TEXT DEFAULT '[]',
     interesting_headers TEXT DEFAULT '[]',
     interesting_parameters TEXT DEFAULT '[]',
+    interesting_endpoints TEXT DEFAULT '[]',
     high_level_testing_ideas TEXT DEFAULT '[]',
+    manual_test_checklist TEXT DEFAULT '[]',
+    payload_references TEXT DEFAULT '[]',
     related_frameworks TEXT DEFAULT '[]',
-    related_bug_classes TEXT DEFAULT '[]',
     related_writeups TEXT DEFAULT '[]',
     related_cves TEXT DEFAULT '[]',
+    related_cwes TEXT DEFAULT '[]',
     refs TEXT DEFAULT '[]',
     confidence TEXT DEFAULT 'unknown',
     raw_content TEXT,
+    normalized_content TEXT,
     metadata TEXT DEFAULT '[]'
 );
 
@@ -63,6 +73,83 @@ CREATE VIRTUAL TABLE IF NOT EXISTS skos_fts USING fts5(
     title, summary, raw_content, content='skos', content_rowid='rowid'
 );
 """
+
+_NEW_COLUMNS: list[str] = [
+    "schema_version",
+    "description",
+    "operating_system",
+    "authorization",
+    "business_logic",
+    "attack_surface",
+    "interesting_endpoints",
+    "manual_test_checklist",
+    "payload_references",
+    "related_cwes",
+    "normalized_content",
+]
+
+# Mapping from Pydantic field name to SQL column name.
+_FIELD_TO_COLUMN: dict[str, str] = {
+    "references": "refs",
+    "programming_language": "language",
+    "created_at": "created",
+    "updated_at": "updated",
+}
+
+# Columns whose value is a JSON string in SQLite; populated from FIELD_TO_COLUMN
+# values + field names that are already native SQL columns.
+_JSON_COLUMNS: set[str] = {
+    "tags",
+    "technology",
+    "framework",
+    "language",
+    "operating_system",
+    "cloud_provider",
+    "bug_classes",
+    "authentication",
+    "authorization",
+    "trust_boundaries",
+    "business_logic",
+    "attack_surface",
+    "interesting_headers",
+    "interesting_parameters",
+    "interesting_endpoints",
+    "high_level_testing_ideas",
+    "manual_test_checklist",
+    "payload_references",
+    "related_frameworks",
+    "related_writeups",
+    "related_cves",
+    "related_cwes",
+    "refs",
+    "metadata",
+}
+
+_INSERT_COLUMNS: list[str] = [
+    "id", "schema_version", "title", "summary", "description", "source",
+    "source_type", "document_type", "author", "created", "updated",
+    "tags", "technology", "framework", "language", "operating_system",
+    "cloud_provider", "bug_classes", "authentication", "authorization",
+    "trust_boundaries", "business_logic", "attack_surface",
+    "interesting_headers", "interesting_parameters", "interesting_endpoints",
+    "high_level_testing_ideas", "manual_test_checklist", "payload_references",
+    "related_frameworks", "related_writeups",
+    "related_cves", "related_cwes", "refs", "confidence",
+    "raw_content", "normalized_content", "metadata",
+]
+
+_UPDATE_COLUMNS: list[str] = [
+    "schema_version", "title", "summary", "description", "source",
+    "source_type", "document_type", "author", "created", "updated",
+    "tags", "technology", "framework", "language", "operating_system",
+    "cloud_provider", "bug_classes", "authentication", "authorization",
+    "trust_boundaries", "business_logic", "attack_surface",
+    "interesting_headers", "interesting_parameters", "interesting_endpoints",
+    "high_level_testing_ideas", "manual_test_checklist", "payload_references",
+    "related_frameworks", "related_writeups",
+    "related_cves", "related_cwes", "refs", "confidence",
+    "raw_content", "normalized_content", "metadata",
+]
 
 
 class KnowledgeStore:
@@ -83,9 +170,19 @@ class KnowledgeStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._init_schema()
+        self._migrate()
 
     def _init_schema(self) -> None:
         self._conn.executescript(_SCHEMA_SQL)
+        self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Add columns that may not exist in older databases."""
+        for col in _NEW_COLUMNS:
+            try:
+                self._conn.execute(f"ALTER TABLE skos ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError:
+                pass
         self._conn.commit()
 
     # ------------------------------------------------------------------
@@ -93,17 +190,6 @@ class KnowledgeStore:
     # ------------------------------------------------------------------
 
     def add(self, sko: SecurityKnowledgeObject) -> str:
-        """Add an SKO to the store.
-
-        Args:
-            sko: The security knowledge object to add.
-
-        Returns:
-            The SKO's ID.
-
-        Raises:
-            StorageError: If an SKO with the same ID already exists.
-        """
         existing = self._conn.execute(
             "SELECT id FROM skos WHERE id = ?", (sko.id,)
         ).fetchone()
@@ -116,17 +202,6 @@ class KnowledgeStore:
         return sko.id
 
     def add_batch(self, skos: Sequence[SecurityKnowledgeObject]) -> list[str]:
-        """Add multiple SKOs atomically.
-
-        Args:
-            skos: Collection of SKOs to add.
-
-        Returns:
-            List of IDs for the added SKOs.
-
-        Raises:
-            StorageError: If any SKO's ID collides.
-        """
         ids: list[str] = []
         for sko in skos:
             existing = self._conn.execute(
@@ -143,28 +218,12 @@ class KnowledgeStore:
         return ids
 
     def get(self, sko_id: str) -> SecurityKnowledgeObject | None:
-        """Retrieve an SKO by its ID.
-
-        Args:
-            sko_id: The SKO identifier.
-
-        Returns:
-            The SKO if found, otherwise ``None``.
-        """
         row = self._conn.execute(
             "SELECT * FROM skos WHERE id = ?", (sko_id,)
         ).fetchone()
         return self._row_to_sko(row) if row else None
 
     def update(self, sko: SecurityKnowledgeObject) -> None:
-        """Update an existing SKO in the store.
-
-        Args:
-            sko: The SKO with updated fields.
-
-        Raises:
-            StorageError: If the SKO does not exist.
-        """
         existing = self._conn.execute(
             "SELECT id FROM skos WHERE id = ?", (sko.id,)
         ).fetchone()
@@ -177,14 +236,6 @@ class KnowledgeStore:
         logger.debug("Updated SKO %s", sko.id)
 
     def delete(self, sko_id: str) -> bool:
-        """Remove an SKO from the store.
-
-        Args:
-            sko_id: The SKO identifier to remove.
-
-        Returns:
-            ``True`` if the SKO was removed, ``False`` if not found.
-        """
         cursor = self._conn.execute("DELETE FROM skos WHERE id = ?", (sko_id,))
         self._conn.commit()
         removed = cursor.rowcount > 0
@@ -193,17 +244,14 @@ class KnowledgeStore:
         return removed
 
     def count(self) -> int:
-        """Return the number of stored SKOs."""
         row = self._conn.execute("SELECT COUNT(*) as cnt FROM skos").fetchone()
         return row["cnt"] if row else 0
 
     def list_all(self) -> list[SecurityKnowledgeObject]:
-        """Return all SKOs."""
         rows = self._conn.execute("SELECT * FROM skos ORDER BY created").fetchall()
         return [self._row_to_sko(r) for r in rows]
 
     def clear(self) -> None:
-        """Remove all SKOs from the store."""
         self._conn.execute("DELETE FROM tag_index")
         self._conn.execute("DELETE FROM skos")
         self._conn.commit()
@@ -214,15 +262,6 @@ class KnowledgeStore:
     # ------------------------------------------------------------------
 
     def search_by_title(self, query: str, case_sensitive: bool = False) -> list[SecurityKnowledgeObject]:
-        """Search SKOs whose title contains the query string.
-
-        Args:
-            query: Substring to search for in titles.
-            case_sensitive: Whether the match is case-sensitive.
-
-        Returns:
-            Matching SKOs.
-        """
         if case_sensitive:
             rows = self._conn.execute(
                 "SELECT * FROM skos WHERE title GLOB ?",
@@ -236,14 +275,6 @@ class KnowledgeStore:
         return [self._row_to_sko(r) for r in rows]
 
     def search_by_tag(self, tag: str) -> list[SecurityKnowledgeObject]:
-        """Return all SKOs with a given tag.
-
-        Args:
-            tag: The tag to filter by.
-
-        Returns:
-            SKOs tagged with the given tag.
-        """
         tag_lower = tag.lower()
         rows = self._conn.execute(
             """SELECT skos.* FROM skos
@@ -254,14 +285,6 @@ class KnowledgeStore:
         return [self._row_to_sko(r) for r in rows]
 
     def search_by_bug_class(self, bug_class: str) -> list[SecurityKnowledgeObject]:
-        """Return all SKOs that reference a specific bug class.
-
-        Args:
-            bug_class: The bug class name (case-insensitive).
-
-        Returns:
-            Matching SKOs.
-        """
         q = bug_class.lower()
         rows = self._conn.execute(
             "SELECT * FROM skos WHERE LOWER(bug_classes) LIKE ?",
@@ -270,14 +293,6 @@ class KnowledgeStore:
         return [self._row_to_sko(r) for r in rows]
 
     def search_raw_content(self, query: str) -> list[SecurityKnowledgeObject]:
-        """Search SKO raw content using LIKE (case-insensitive).
-
-        Args:
-            query: Substring to search for in raw content.
-
-        Returns:
-            Matching SKOs.
-        """
         rows = self._conn.execute(
             "SELECT * FROM skos WHERE LOWER(raw_content) LIKE LOWER(?)",
             (f"%{query}%",),
@@ -285,7 +300,6 @@ class KnowledgeStore:
         return [self._row_to_sko(r) for r in rows]
 
     def search_source_type(self, source_type: str) -> list[SecurityKnowledgeObject]:
-        """Return all SKOs with a given source type."""
         q = source_type.lower().replace("-", "_")
         rows = self._conn.execute(
             "SELECT * FROM skos WHERE source_type = ?", (q,)
@@ -297,17 +311,9 @@ class KnowledgeStore:
     # ------------------------------------------------------------------
 
     def save(self, path: str | Path | None = None) -> None:
-        """The SQLite store is auto-persisting. This is a no-op.
-
-        Provided for backward compatibility with code that calls save().
-        """
         logger.debug("SQLite store auto-persists; save() is a no-op")
 
     def load(self, path: str | Path | None = None) -> int:
-        """The SQLite store is auto-loading. This is a no-op.
-
-        Provided for backward compatibility with code that calls load().
-        """
         return self.count()
 
     # ------------------------------------------------------------------
@@ -317,29 +323,14 @@ class KnowledgeStore:
     @staticmethod
     def _map_data(data: dict) -> dict:
         """Map Pydantic field names to SQL column names."""
-        mapping = {"references": "refs"}
-        return {mapping.get(k, k): v for k, v in data.items()}
+        return {_FIELD_TO_COLUMN.get(k, k): v for k, v in data.items()}
 
     def _insert_sko(self, sko: SecurityKnowledgeObject) -> None:
         data = self._map_data(self._flatten_for_sql(sko.model_dump(mode="json")))
+        placeholders = ", ".join(f":{c}" for c in _INSERT_COLUMNS)
+        columns = ", ".join(_INSERT_COLUMNS)
         self._conn.execute(
-            """INSERT INTO skos (
-                id, title, summary, source, source_type, document_type,
-                author, created, updated, tags, technology, framework,
-                language, cloud_provider, bug_classes, authentication,
-                trust_boundaries, interesting_headers, interesting_parameters,
-                high_level_testing_ideas, related_frameworks, related_bug_classes,
-                related_writeups, related_cves, refs, confidence,
-                raw_content, metadata
-            ) VALUES (
-                :id, :title, :summary, :source, :source_type, :document_type,
-                :author, :created, :updated, :tags, :technology, :framework,
-                :language, :cloud_provider, :bug_classes, :authentication,
-                :trust_boundaries, :interesting_headers, :interesting_parameters,
-                :high_level_testing_ideas, :related_frameworks, :related_bug_classes,
-                :related_writeups, :related_cves, :refs, :confidence,
-                :raw_content, :metadata
-            )""",
+            f"INSERT INTO skos ({columns}) VALUES ({placeholders})",
             data,
         )
         for tag in sko.tags:
@@ -350,25 +341,9 @@ class KnowledgeStore:
 
     def _update_sko(self, sko: SecurityKnowledgeObject) -> None:
         data = self._map_data(self._flatten_for_sql(sko.model_dump(mode="json")))
+        set_clause = ", ".join(f"{c}=:{c}" for c in _UPDATE_COLUMNS)
         self._conn.execute(
-            """UPDATE skos SET
-                title=:title, summary=:summary, source=:source,
-                source_type=:source_type, document_type=:document_type,
-                author=:author, created=:created, updated=:updated,
-                tags=:tags, technology=:technology, framework=:framework,
-                language=:language, cloud_provider=:cloud_provider,
-                bug_classes=:bug_classes, authentication=:authentication,
-                trust_boundaries=:trust_boundaries,
-                interesting_headers=:interesting_headers,
-                interesting_parameters=:interesting_parameters,
-                high_level_testing_ideas=:high_level_testing_ideas,
-                related_frameworks=:related_frameworks,
-                related_bug_classes=:related_bug_classes,
-                related_writeups=:related_writeups,
-                related_cves=:related_cves, refs=:refs,
-                confidence=:confidence, raw_content=:raw_content,
-                metadata=:metadata
-            WHERE id=:id""",
+            f"UPDATE skos SET {set_clause} WHERE id=:id",
             data,
         )
         for tag in sko.tags:
@@ -391,20 +366,18 @@ class KnowledgeStore:
     def _row_to_sko(self, row: sqlite3.Row) -> SecurityKnowledgeObject:
         """Convert a SQLite row back to a SecurityKnowledgeObject."""
         data = dict(row)
-        if "refs" in data:
-            data["references"] = data.pop("refs")
-        json_fields = {
-            "tags", "technology", "framework", "language", "cloud_provider",
-            "bug_classes", "authentication", "trust_boundaries",
-            "interesting_headers", "interesting_parameters",
-            "high_level_testing_ideas", "related_frameworks",
-            "related_bug_classes", "related_writeups", "related_cves",
-            "references", "metadata",
-        }
-        for field in json_fields:
-            if field in data and isinstance(data[field], str):
+        # Deserialize JSON columns BEFORE mapping column → field names,
+        # because the column values are stored under their SQL column names
+        # (which may differ from the Pydantic field names).
+        for col in _JSON_COLUMNS:
+            if col in data and isinstance(data[col], str):
                 try:
-                    data[field] = json.loads(data[field])
+                    data[col] = json.loads(data[col])
                 except (json.JSONDecodeError, TypeError):
                     pass
-        return SecurityKnowledgeObject(**data)
+        # Map SQL column names back to Pydantic field names.
+        col_to_field = {v: k for k, v in _FIELD_TO_COLUMN.items()}
+        mapped: dict = {}
+        for k, v in data.items():
+            mapped[col_to_field.get(k, k)] = v
+        return SecurityKnowledgeObject(**mapped)
