@@ -156,6 +156,29 @@ class LLMConfig(BaseSettings):
     max_tokens: int = Field(default=2048, ge=1)
 
 
+class PlanningConfig(BaseSettings):
+    """Configuration for the Investigation Planning Engine."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    enabled: bool = Field(default=True)
+    max_steps_per_plan: int = Field(default=50, ge=1, le=200)
+    default_estimated_hours: float = Field(default=2.0, ge=0.0)
+    enable_technology_rules: bool = Field(default=True)
+    enable_authentication_rules: bool = Field(default=True)
+    enable_bug_class_rules: bool = Field(default=True)
+    enable_framework_rules: bool = Field(default=True)
+    enable_cloud_rules: bool = Field(default=True)
+    enable_business_logic_rules: bool = Field(default=True)
+    enable_recon_rules: bool = Field(default=True)
+    enable_endpoint_rules: bool = Field(default=True)
+    enable_file_upload_rules: bool = Field(default=True)
+    enable_authorization_rules: bool = Field(default=True)
+    enable_privilege_escalation_rules: bool = Field(default=True)
+    minimum_priority_threshold: float = Field(default=0.0, ge=0.0, le=1.0)
+    priority_weights_file: str = Field(default="")
+
+
 class DeepHunterConfig(BaseSettings):
     """Root configuration for the DeepHunter platform.
 
@@ -182,6 +205,7 @@ class DeepHunterConfig(BaseSettings):
     ingestion: IngestionConfig = Field(default_factory=IngestionConfig)
     rag: RAGConfig = Field(default_factory=RAGConfig)
     reasoning: ReasoningConfig = Field(default_factory=ReasoningConfig)
+    planning: PlanningConfig = Field(default_factory=PlanningConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)

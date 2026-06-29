@@ -363,5 +363,59 @@ def init(output: str) -> None:
     console.print("Edit this file to customize DeepHunter behavior.")
 
 
+@cli.command()
+@click.argument("target")
+@click.pass_context
+def plan(ctx: click.Context, target: str) -> None:
+    """Generate an investigation plan for a target.
+
+    Creates a phased, prioritized investigation plan based on
+    the target description and available knowledge.
+    """
+    console.print("[yellow]Planning engine active. Generating investigation plan...[/yellow]")
+    console.print(f"[bold]Target:[/bold] {target}")
+
+    from deephunter.reasoning.session import InvestigationSession
+    from deephunter.planning import Planner, PlanningPhase
+
+    session = InvestigationSession.new(target)
+    planner = Planner()
+    result = planner.plan_from_session(session)
+
+    plan = result.plan
+    if not plan.steps:
+        console.print("[yellow]No investigation steps generated. Add more context.[/yellow]")
+        return
+
+    table = Table(title=f"Investigation Plan — {target}")
+    table.add_column("Phase", style="cyan")
+    table.add_column("Step", style="white")
+    table.add_column("Priority", style="green")
+    table.add_column("Est. Hours", style="yellow")
+    table.add_column("Risk", style="red")
+
+    for step in plan.steps:
+        table.add_row(
+            step.phase.value,
+            step.title[:60],
+            f"{step.priority_score:.2f}",
+            str(step.estimated_cost_hours),
+            str(step.risk.overall),
+        )
+
+    console.print(table)
+    console.print(f"[bold]Total estimated hours:[/bold] {plan.total_estimated_hours:.1f}")
+    console.print(f"[bold]Phases covered:[/bold] {len(plan.phases_covered)}/{len(list(PlanningPhase))}")
+    console.print(f"[bold]Risk score:[/bold] {plan.risk.overall:.1f}/10.0")
+
+
+@cli.command()
+@click.pass_context
+def roadmap(ctx: click.Context) -> None:
+    """Show the investigation roadmap from latest plan."""
+    console.print("[yellow]Roadmap command: Load the latest investigation plan and display ordered steps.[/yellow]")
+    console.print("Use 'deephunter plan <target>' first to generate a plan.")
+
+
 if __name__ == "__main__":
     cli()
