@@ -1,12 +1,18 @@
 """Core module — configuration, exceptions, and base types."""
 
-from deephunter.core.config import DeepHunterConfig
+from deephunter.core.config import (
+    ContextConfig,
+    DeepHunterConfig,
+    PromptConfig,
+)
 from deephunter.core.exceptions import (
     ConfigurationError,
+    ContextError,
     DeepHunterError,
     EvaluationError,
     IngestionError,
     ParsingError,
+    PromptError,
     ReasoningError,
     RetrievalError,
     StorageError,
@@ -33,9 +39,13 @@ from deephunter.core.types import (
 )
 
 __all__ = [
+    "ContextConfig",
     "DeepHunterConfig",
+    "PromptConfig",
     "DeepHunterError",
     "ConfigurationError",
+    "ContextError",
+    "PromptError",
     "ParsingError",
     "IngestionError",
     "StorageError",

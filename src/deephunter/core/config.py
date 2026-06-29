@@ -179,6 +179,45 @@ class PlanningConfig(BaseSettings):
     priority_weights_file: str = Field(default="")
 
 
+class ContextConfig(BaseSettings):
+    """Configuration for the Context Engine."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    enabled: bool = Field(default=True)
+    max_sections: int = Field(default=20, ge=1, le=100)
+    max_blocks_per_section: int = Field(default=50, ge=1, le=500)
+    default_max_tokens: int = Field(default=8192, ge=256, le=1_000_000)
+    enable_knowledge_collection: bool = Field(default=True)
+    enable_evidence_collection: bool = Field(default=True)
+    enable_plan_integration: bool = Field(default=True)
+    enable_deduplication: bool = Field(default=True)
+    enable_prioritization: bool = Field(default=True)
+    enable_token_budgeting: bool = Field(default=True)
+    enable_compression: bool = Field(default=True)
+    enable_summaries: bool = Field(default=True)
+
+
+class PromptConfig(BaseSettings):
+    """Configuration for the Prompt Builder."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    enabled: bool = Field(default=True)
+    default_style: str = Field(default="investigation")
+    default_format: str = Field(default="markdown")
+    token_estimation_method: str = Field(
+        default="word_count",
+        description="Token estimation method: word_count, character_count, tiktoken",
+    )
+    max_prompt_tokens: int = Field(default=128_000, ge=256)
+    enable_templates: bool = Field(default=True)
+    enable_adapters: bool = Field(default=True)
+    enable_metadata: bool = Field(default=True)
+    enable_statistics: bool = Field(default=True)
+    template_directory: str = Field(default="")
+
+
 class DeepHunterConfig(BaseSettings):
     """Root configuration for the DeepHunter platform.
 
@@ -206,6 +245,8 @@ class DeepHunterConfig(BaseSettings):
     rag: RAGConfig = Field(default_factory=RAGConfig)
     reasoning: ReasoningConfig = Field(default_factory=ReasoningConfig)
     planning: PlanningConfig = Field(default_factory=PlanningConfig)
+    context: ContextConfig = Field(default_factory=ContextConfig)
+    prompt: PromptConfig = Field(default_factory=PromptConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)

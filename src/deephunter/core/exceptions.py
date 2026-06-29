@@ -37,5 +37,13 @@ class EvaluationError(DeepHunterError):
     """Raised when evaluation of results fails."""
 
 
+class ContextError(DeepHunterError):
+    """Raised when context engine operations fail."""
+
+
+class PromptError(DeepHunterError):
+    """Raised when prompt builder operations fail."""
+
+
 class TrainingError(DeepHunterError):
     """Raised when dataset creation or model training fails."""
