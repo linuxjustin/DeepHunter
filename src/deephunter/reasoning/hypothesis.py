@@ -2,14 +2,16 @@
 
 Produces ranked investigation hypotheses based on retrieved SKOs,
 bug class prevalence, technology stacks, and framework-aware reasoning.
+
+Uses an LLM provider when available, with template-based fallback
+for offline operation.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional, Set
 from uuid import uuid4
 
 from deephunter.core.config import ReasoningConfig
@@ -17,6 +19,7 @@ from deephunter.core.exceptions import ReasoningError
 from deephunter.core.types import BugClass, Confidence, Technology
 from deephunter.knowledge.models import SecurityKnowledgeObject
 from deephunter.knowledge.store import KnowledgeStore
+from deephunter.llm.base import LLMProvider
 from deephunter.rag.retriever import Retriever
 from deephunter.utils.logging import get_logger
 
@@ -42,17 +45,17 @@ class Hypothesis:
     id: str = field(default_factory=lambda: f"hyp-{uuid4().hex[:12]}")
     title: str = ""
     description: str = ""
-    bug_classes: List[BugClass] = field(default_factory=list)
-    technology: List[Technology] = field(default_factory=list)
+    bug_classes: list[BugClass] = field(default_factory=list)
+    technology: list[Technology] = field(default_factory=list)
     priority: HypothesisPriority = HypothesisPriority.MEDIUM
     confidence: Confidence = Confidence.UNKNOWN
     rationale: str = ""
-    testing_ideas: List[str] = field(default_factory=list)
-    related_skos: List[str] = field(default_factory=list)
-    references: List[str] = field(default_factory=list)
-    created: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    testing_ideas: list[str] = field(default_factory=list)
+    related_skos: list[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
+    created: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "id": self.id,
             "title": self.title,
@@ -69,21 +72,40 @@ class Hypothesis:
         }
 
 
+HYPOTHESIS_PROMPT_TEMPLATE = """You are a senior security researcher generating investigation hypotheses.
+
+Given the following security knowledge context and bug class distribution,
+generate ranked investigation hypotheses for the target: {context}
+
+Relevant bug classes found in knowledge base:
+{bug_classes}
+
+Relevant technologies:
+{technologies}
+
+Related knowledge snippets:
+{knowledge_snippets}
+
+For each hypothesis, provide:
+1. Title: A concise title
+2. Description: What vulnerability to investigate
+3. Bug Class: The primary bug class
+4. Rationale: Why this is worth investigating
+5. Testing Ideas: 1-2 specific testing approaches
+6. Priority: critical/high/medium/low
+
+Respond with a JSON array of hypotheses."""
+
+
 class HypothesisGenerator:
     """Generates ranked investigation hypotheses from knowledge.
 
-    The generator uses the RAG retriever to find relevant SKOs,
-    then applies heuristic rules to produce hypotheses ranked
-    by priority and confidence.
-
-    Usage::
-
-        gen = HypothesisGenerator(store, retriever, config.reasoning)
-        hypotheses = gen.generate("JWT authentication")
+    Uses the LLM provider for intelligent hypothesis generation when
+    available, with a deterministic template-based fallback for offline mode.
     """
 
-    # Rule templates mapping bug classes to hypothesis templates
-    HYPOTHESIS_RULES: Dict[BugClass, Dict[str, str]] = {
+    # Template-based fallback rules
+    FALLBACK_RULES: dict[BugClass, dict[str, str]] = {
         BugClass.AUTH_BYPASS: {
             "title": "Authentication bypass in {tech} application",
             "description": (
@@ -175,17 +197,22 @@ class HypothesisGenerator:
         store: KnowledgeStore,
         retriever: Retriever,
         config: ReasoningConfig,
+        llm_provider: LLMProvider | None = None,
     ) -> None:
         self._store = store
         self._retriever = retriever
         self._config = config
+        self._llm_provider = llm_provider
 
     def generate(
         self,
         context: str,
-        skos: Optional[List[SecurityKnowledgeObject]] = None,
-    ) -> List[Hypothesis]:
+        skos: list[SecurityKnowledgeObject] | None = None,
+    ) -> list[Hypothesis]:
         """Generate hypotheses based on a context query and optional SKOs.
+
+        Uses the LLM provider when available, falls back to template-based
+        generation for offline operation.
 
         Args:
             context: Description of the target or research focus.
@@ -204,15 +231,108 @@ class HypothesisGenerator:
         except Exception as exc:
             raise ReasoningError(f"Failed to retrieve context SKOs: {exc}") from exc
 
-        bug_class_counts: Dict[BugClass, int] = {}
-        tech_set: Set[Technology] = set()
+        if self._llm_provider is not None:
+            try:
+                return self._generate_with_llm(context, skos)
+            except Exception as exc:
+                logger.warning("LLM hypothesis generation failed, using fallback: %s", exc)
+
+        return self._generate_fallback(context, skos)
+
+    def _generate_with_llm(
+        self,
+        context: str,
+        skos: list[SecurityKnowledgeObject],
+    ) -> list[Hypothesis]:
+        """Generate hypotheses using the LLM provider."""
+        bug_classes = set()
+        technologies = set()
+        snippets: list[str] = []
+
+        for sko in skos:
+            bug_classes.update(sko.bug_classes)
+            technologies.update(sko.technology)
+            if sko.raw_content:
+                snippets.append(sko.raw_content[:300])
+
+        bc_str = ", ".join(b.value for b in sorted(bug_classes, key=lambda x: x.value))
+        tech_str = ", ".join(t.value for t in sorted(technologies, key=lambda x: x.value))
+        snippet_str = "\n".join(f"- {s}" for s in snippets[:5])
+
+        prompt = HYPOTHESIS_PROMPT_TEMPLATE.format(
+            context=context,
+            bug_classes=bc_str or "none detected",
+            technologies=tech_str or "unknown",
+            knowledge_snippets=snippet_str or "no relevant knowledge found",
+        )
+
+        response = self._llm_provider.generate(
+            prompt=prompt,
+            system_prompt="You are a senior security researcher. Output only valid JSON.",
+            temperature=0.3,
+        )
+
+        try:
+            import json
+            data = json.loads(response.content)
+            return self._parse_llm_hypotheses(data, skos)
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            logger.warning("Failed to parse LLM hypothesis output: %s", exc)
+            raise ReasoningError(f"LLM output was not valid JSON: {exc}") from exc
+
+    def _parse_llm_hypotheses(
+        self,
+        data: list[dict],
+        skos: list[SecurityKnowledgeObject],
+    ) -> list[Hypothesis]:
+        """Parse structured JSON output from LLM into Hypothesis objects."""
+        hypotheses: list[Hypothesis] = []
+        for item in data[: self._config.hypothesis_limit]:
+            bc_values = item.get("bug_class", "")
+            if isinstance(bc_values, str):
+                bc_values = [bc_values]
+
+            bug_classes: list[BugClass] = []
+            for val in bc_values:
+                try:
+                    bug_classes.append(BugClass(val.lower().replace(" ", "_")))
+                except ValueError:
+                    pass
+
+            priority_str = item.get("priority", "medium").lower()
+            try:
+                priority = HypothesisPriority(priority_str)
+            except ValueError:
+                priority = HypothesisPriority.MEDIUM
+
+            hyp = Hypothesis(
+                title=item.get("title", "Untitled hypothesis"),
+                description=item.get("description", ""),
+                bug_classes=bug_classes,
+                priority=priority,
+                confidence=Confidence.MEDIUM,
+                rationale=item.get("rationale", ""),
+                testing_ideas=item.get("testing_ideas", []),
+                related_skos=[s.id for s in skos[:3]],
+            )
+            hypotheses.append(hyp)
+
+        return hypotheses
+
+    def _generate_fallback(
+        self,
+        context: str,
+        skos: list[SecurityKnowledgeObject],
+    ) -> list[Hypothesis]:
+        """Generate hypotheses using template-based fallback."""
+        bug_class_counts: dict[BugClass, int] = {}
+        tech_set: set[Technology] = set()
 
         for sko in skos:
             for bc in sko.bug_classes:
                 bug_class_counts[bc] = bug_class_counts.get(bc, 0) + 1
             tech_set.update(sko.technology)
 
-        # Also scan store-wide for relevant patterns
         all_skos = self._store.list_all()
         for sko in all_skos:
             for bc in sko.bug_classes:
@@ -221,11 +341,11 @@ class HypothesisGenerator:
 
         tech_list = list(tech_set) if tech_set else [Technology.OTHER]
 
-        hypotheses: List[Hypothesis] = []
+        hypotheses: list[Hypothesis] = []
         for bc, count in bug_class_counts.items():
             if count <= 0:
                 continue
-            rule = self.HYPOTHESIS_RULES.get(bc)
+            rule = self.FALLBACK_RULES.get(bc)
             if rule is None:
                 continue
 
@@ -249,7 +369,7 @@ class HypothesisGenerator:
         limit = self._config.hypothesis_limit
         hypotheses = hypotheses[:limit]
 
-        logger.info("Generated %d hypotheses", len(hypotheses))
+        logger.info("Generated %d fallback hypotheses", len(hypotheses))
         return hypotheses
 
     @staticmethod

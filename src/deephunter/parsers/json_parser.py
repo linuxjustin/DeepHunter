@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from deephunter.core.exceptions import ParsingError
 from deephunter.core.types import DocumentType
-from deephunter.parsers.base import ParseResult, Parser, ParserRegistry
+from deephunter.parsers.base import Parser, ParseResult
 
 
 class JSONParser(Parser):
@@ -26,7 +26,7 @@ class JSONParser(Parser):
         return {".json"}
 
     def parse(
-        self, content: str | bytes, source_path: Optional[str] = None
+        self, content: str | bytes, source_path: str | None = None
     ) -> ParseResult:
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
@@ -35,12 +35,12 @@ class JSONParser(Parser):
             raise ParsingError("Empty JSON content")
 
         try:
-            data: Union[Dict[str, Any], List[Any]] = json.loads(content)
+            data: dict[str, Any] | list[Any] = json.loads(content)
         except json.JSONDecodeError as exc:
             raise ParsingError(f"JSON parsing failed: {exc}") from exc
 
         text = self._flatten(data)
-        sections: Dict[str, str] = {}
+        sections: dict[str, str] = {}
 
         if isinstance(data, dict):
             for key, value in data.items():
@@ -49,7 +49,7 @@ class JSONParser(Parser):
                 else:
                     sections[str(key)] = self._flatten(value)
 
-        metadata: Dict[str, str] = {}
+        metadata: dict[str, str] = {}
         source_path_obj = Path(source_path) if source_path else None
         if source_path_obj:
             metadata["filename"] = source_path_obj.name
@@ -74,13 +74,10 @@ class JSONParser(Parser):
                 JSONParser._flatten(item, depth + 1) for item in data
             )
         if isinstance(data, dict):
-            parts: List[str] = []
+            parts: list[str] = []
             for key, value in data.items():
                 flat = JSONParser._flatten(value, depth + 1)
                 if flat:
                     parts.append(f"{key}: {flat}")
             return "\n".join(parts)
         return str(data) if data is not None else ""
-
-
-ParserRegistry.register(JSONParser())

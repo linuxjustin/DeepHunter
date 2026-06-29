@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Type
+from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 
@@ -20,10 +20,10 @@ class AgentResult:
     agent_name: str
     success: bool
     data: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     execution_time_ms: float = 0.0
     result_id: str = field(default_factory=lambda: f"res-{uuid4().hex[:12]}")
-    created: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class Agent(ABC):
@@ -34,7 +34,7 @@ class Agent(ABC):
     orchestrator.
     """
 
-    def __init__(self, name: Optional[str] = None) -> None:
+    def __init__(self, name: str | None = None) -> None:
         self._name = name or self.__class__.__name__
         self._description = ""
 
@@ -47,7 +47,7 @@ class Agent(ABC):
         return self._description
 
     @abstractmethod
-    def execute(self, context: Dict[str, Any]) -> AgentResult:
+    def execute(self, context: dict[str, Any]) -> AgentResult:
         """Execute the agent's task.
 
         Args:
@@ -61,31 +61,30 @@ class Agent(ABC):
 class AgentRegistry:
     """Registry of available agent classes."""
 
-    _agents: Dict[str, Type[Agent]] = {}
+    def __init__(self) -> None:
+        self._agents: dict[str, type[Agent]] = {}
 
-    @classmethod
-    def register(cls, agent_cls: Type[Agent]) -> Type[Agent]:
+    def register(self, agent_cls: type[Agent]) -> type[Agent]:
         """Register an agent class by its name.
 
         Can be used as a decorator::
 
-            @AgentRegistry.register
+            registry = AgentRegistry()
+
+            @registry.register
             class MyAgent(Agent): ...
         """
         name = agent_cls.__name__
-        if name in cls._agents:
+        if name in self._agents:
             raise ValueError(f"Agent '{name}' is already registered")
-        cls._agents[name] = agent_cls
+        self._agents[name] = agent_cls
         return agent_cls
 
-    @classmethod
-    def get(cls, name: str) -> Optional[Type[Agent]]:
-        return cls._agents.get(name)
+    def get(self, name: str) -> type[Agent] | None:
+        return self._agents.get(name)
 
-    @classmethod
-    def list_names(cls) -> List[str]:
-        return list(cls._agents.keys())
+    def list_names(self) -> list[str]:
+        return list(self._agents.keys())
 
-    @classmethod
-    def clear(cls) -> None:
-        cls._agents.clear()
+    def clear(self) -> None:
+        self._agents.clear()

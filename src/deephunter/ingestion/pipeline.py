@@ -8,15 +8,15 @@ SecurityKnowledgeObject, and stores it.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Set
 
 from deephunter.core.config import DeepHunterConfig
-from deephunter.core.exceptions import IngestionError, ParsingError
+from deephunter.core.exceptions import ParsingError
 from deephunter.core.types import DocumentType, SourceType
 from deephunter.ingestion.extractor import MetadataExtractor
-from deephunter.knowledge.models import SKOBuilder, SecurityKnowledgeObject
+from deephunter.knowledge.models import SecurityKnowledgeObject
 from deephunter.knowledge.store import KnowledgeStore
-from deephunter.parsers.base import ParserRegistry, ParseResult
+from deephunter.parsers import default_registry as _default_parser_registry
+from deephunter.parsers.base import ParseResult, ParserRegistry
 from deephunter.utils.files import list_files
 from deephunter.utils.logging import get_logger
 
@@ -38,15 +38,17 @@ class IngestionPipeline:
         self,
         config: DeepHunterConfig,
         store: KnowledgeStore,
+        parser_registry: ParserRegistry | None = None,
     ) -> None:
         self._config = config
         self._store = store
+        self._parser_registry = parser_registry or _default_parser_registry
         self._extractor = MetadataExtractor()
 
     def run(
         self,
-        directories: Optional[List[str]] = None,
-    ) -> Dict[str, int]:
+        directories: list[str] | None = None,
+    ) -> dict[str, int]:
         """Run the full ingestion pipeline on the configured directories.
 
         Args:
@@ -134,7 +136,7 @@ class IngestionPipeline:
 
     def _parse_file(self, path: Path) -> ParseResult:
         """Route a file to the correct parser and return the result."""
-        parser = ParserRegistry.get_for_path(path)
+        parser = self._parser_registry.get_for_path(path)
         if parser is None:
             raise ParsingError(f"No parser found for {path.suffix}")
 
@@ -146,27 +148,22 @@ class IngestionPipeline:
         content_text = result.content
         meta = result.metadata
 
-        builder = (
-            SKOBuilder()
-            .title(meta.get("title", path.stem))
-            .summary(content_text[:500] if content_text else "")
-            .source(str(path))
-            .source_type(self._detect_source_type(path))
-            .document_type(self._detect_document_type(path))
-            .raw_content(content_text)
+        sko = SecurityKnowledgeObject(
+            title=meta.get("title", path.stem),
+            summary=(content_text[:500] if content_text else ""),
+            source=str(path),
+            source_type=self._detect_source_type(path),
+            document_type=self._detect_document_type(path),
+            raw_content=content_text,
+            technology=self._extractor.extract_technologies(content_text),
+            bug_classes=self._extractor.extract_bug_classes(content_text),
         )
-
-        for t in self._extractor.extract_technologies(content_text):
-            builder.add_technology(t)
-        for bc in self._extractor.extract_bug_classes(content_text):
-            builder.add_bug_class(bc)
-
-        return builder.build()
+        return sko
 
     def _detect_source_type(self, path: Path) -> SourceType:
         """Heuristic source type detection from the file path."""
         parts = [p.lower() for p in path.parts]
-        source_map: Dict[str, SourceType] = {
+        source_map: dict[str, SourceType] = {
             "hacktricks": SourceType.HACKTRICKS,
             "payloadsallthethings": SourceType.PAYLOADS_ALL_THE_THINGS,
             "owasp": SourceType.OWASP,
@@ -201,7 +198,7 @@ class IngestionPipeline:
         }
         return ext_map.get(ext, DocumentType.UNKNOWN)
 
-    def _supported_extensions(self) -> Set[str]:
+    def _supported_extensions(self) -> set[str]:
         """Return the set of all supported file extensions."""
         return {
             ".md", ".markdown",

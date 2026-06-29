@@ -1,20 +1,30 @@
 """Configuration management for DeepHunter.
 
-Uses Pydantic for validation and supports loading from YAML/JSON files
-with environment variable overrides.
+Uses Pydantic for validation, pydantic-settings for environment variable
+overrides, and supports loading from YAML/JSON files.
+
+Environment variables use the prefix ``DEEPHUNTER_`` with double-underscore
+as nested delimiter::
+
+    DEEPHUNTER_RAG__TOP_K=25
+    DEEPHUNTER_LOG_LEVEL=DEBUG
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, ValidationError
 import yaml
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ParserConfig(BaseModel):
-    enabled_parsers: List[str] = Field(
+class ParserConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+    enabled_parsers: list[str] = Field(
         default_factory=lambda: ["markdown", "html", "json", "yaml", "pdf"],
         description="List of active parser identifiers",
     )
@@ -23,8 +33,10 @@ class ParserConfig(BaseModel):
     )
 
 
-class IngestionConfig(BaseModel):
-    watch_directories: List[str] = Field(
+class IngestionConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+    watch_directories: list[str] = Field(
         default_factory=list,
         description="Directories to monitor for new documents",
     )
@@ -32,17 +44,21 @@ class IngestionConfig(BaseModel):
     deduplicate: bool = Field(default=True)
 
 
-class RAGConfig(BaseModel):
+class RAGConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
     embedding_model: str = Field(
-        default="text-embedding-ada-002",
+        default="sentence-transformers/all-MiniLM-L6-v2",
         description="Embedding model identifier",
     )
     top_k: int = Field(default=5, ge=1, le=100)
     similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
-    vector_store_path: Optional[str] = Field(default=None)
+    vector_store_path: str | None = Field(default=None)
 
 
-class ReasoningConfig(BaseModel):
+class ReasoningConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
     hypothesis_limit: int = Field(default=10, ge=1, le=100)
     min_confidence: float = Field(default=0.3, ge=0.0, le=1.0)
     enable_framework_aware: bool = Field(default=True)
@@ -50,25 +66,68 @@ class ReasoningConfig(BaseModel):
     enable_api_aware: bool = Field(default=True)
 
 
-class EvaluationConfig(BaseModel):
-    metrics: List[str] = Field(
+class EvaluationConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+    metrics: list[str] = Field(
         default_factory=lambda: ["precision", "recall", "f1", "hit_rate"],
     )
 
 
-class TrainingConfig(BaseModel):
+class TrainingConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
     output_dir: str = Field(default="./datasets/processed")
     format: str = Field(default="jsonl")
     max_samples: int = Field(default=10000, ge=1)
 
 
-class DeepHunterConfig(BaseModel):
-    """Root configuration for the DeepHunter platform."""
+class LLMConfig(BaseSettings):
+    """Configuration for LLM providers."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    provider: str = Field(
+        default="ollama",
+        description="LLM provider: ollama, openai, anthropic",
+    )
+    model: str = Field(
+        default="deepseek-coder:6.7b",
+        description="Model name for the selected provider",
+    )
+    base_url: str | None = Field(
+        default=None,
+        description="Base URL for the provider API (e.g. http://localhost:11434)",
+    )
+    api_key: str | None = Field(
+        default=None,
+        description="API key for the provider",
+    )
+    temperature: float = Field(default=0.1, ge=0.0, le=2.0)
+    max_tokens: int = Field(default=2048, ge=1)
+
+
+class DeepHunterConfig(BaseSettings):
+    """Root configuration for the DeepHunter platform.
+
+    Supports environment variable overrides with prefix ``DEEPHUNTER_``::
+
+        DEEPHUNTER_LOG_LEVEL=DEBUG
+        DEEPHUNTER_RAG__TOP_K=25
+        DEEPHUNTER_LLM__PROVIDER=openai
+        DEEPHUNTER_LLM__MODEL=gpt-4o
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="DEEPHUNTER_",
+        env_nested_delimiter="__",
+        extra="ignore",
+    )
 
     data_dir: str = Field(default="./knowledge")
     output_dir: str = Field(default="./output")
     log_level: str = Field(default="INFO")
-    log_file: Optional[str] = Field(default=None)
+    log_file: str | None = Field(default=None)
 
     parser: ParserConfig = Field(default_factory=ParserConfig)
     ingestion: IngestionConfig = Field(default_factory=IngestionConfig)
@@ -76,6 +135,7 @@ class DeepHunterConfig(BaseModel):
     reasoning: ReasoningConfig = Field(default_factory=ReasoningConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
+    llm: LLMConfig = Field(default_factory=LLMConfig)
 
     @field_validator("log_level")
     @classmethod
@@ -89,6 +149,8 @@ class DeepHunterConfig(BaseModel):
     @classmethod
     def load(cls, path: str | Path) -> DeepHunterConfig:
         """Load configuration from a YAML or JSON file.
+
+        Environment variables override file values.
 
         Args:
             path: Path to the configuration file.
@@ -104,14 +166,12 @@ class DeepHunterConfig(BaseModel):
         if not path.exists():
             raise FileNotFoundError(f"Configuration file not found: {path}")
 
-        raw: Dict[str, Any]
+        raw: dict[str, Any]
         if path.suffix in {".yaml", ".yml"}:
-            with open(path, "r") as f:
+            with open(path) as f:
                 raw = yaml.safe_load(f) or {}
         elif path.suffix == ".json":
-            import json
-
-            with open(path, "r") as f:
+            with open(path) as f:
                 raw = json.load(f)
         else:
             raise ValueError(f"Unsupported config format: {path.suffix}")

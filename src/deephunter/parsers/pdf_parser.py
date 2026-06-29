@@ -7,11 +7,10 @@ and multi-page documents gracefully.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from deephunter.core.exceptions import ParsingError
 from deephunter.core.types import DocumentType
-from deephunter.parsers.base import ParseResult, Parser, ParserRegistry
+from deephunter.parsers.base import Parser, ParseResult
 
 try:
     from PyPDF2 import PdfReader
@@ -37,7 +36,7 @@ class PDFParser(Parser):
         return {".pdf"}
 
     def parse(
-        self, content: str | bytes, source_path: Optional[str] = None
+        self, content: str | bytes, source_path: str | None = None
     ) -> ParseResult:
         if not HAS_PYPDF2:
             raise ParsingError(
@@ -80,6 +79,3 @@ class PDFParser(Parser):
             metadata=metadata,
             sections=sections,
         )
-
-
-ParserRegistry.register(PDFParser())

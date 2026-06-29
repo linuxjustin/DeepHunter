@@ -8,7 +8,6 @@ ground-truth annotations.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
 
 from deephunter.core.config import EvaluationConfig
 from deephunter.core.exceptions import EvaluationError
@@ -26,9 +25,9 @@ class EvaluationReport:
     f1: float = 0.0
     hit_rate: float = 0.0
     num_queries: int = 0
-    details: List[Dict] = field(default_factory=list)
+    details: list[dict] = field(default_factory=list)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "precision": round(self.precision, 4),
             "recall": round(self.recall, 4),
@@ -48,13 +47,13 @@ class Evaluator:
     - Hit rate: fraction of queries with at least one relevant result.
     """
 
-    def __init__(self, config: Optional[EvaluationConfig] = None) -> None:
+    def __init__(self, config: EvaluationConfig | None = None) -> None:
         self._config = config or EvaluationConfig()
 
     def evaluate_retrieval(
         self,
-        query_results: Dict[str, List[str]],
-        ground_truth: Dict[str, Set[str]],
+        query_results: dict[str, list[str]],
+        ground_truth: dict[str, set[str]],
     ) -> EvaluationReport:
         """Evaluate retrieval performance against ground truth.
 
@@ -73,11 +72,11 @@ class Evaluator:
         if not ground_truth:
             raise EvaluationError("ground_truth must not be empty")
 
-        precisions: List[float] = []
-        recalls: List[float] = []
+        precisions: list[float] = []
+        recalls: list[float] = []
         hits = 0
 
-        details: List[Dict] = []
+        details: list[dict] = []
 
         for query, retrieved in query_results.items():
             relevant = ground_truth.get(query, set())

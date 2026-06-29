@@ -1,14 +1,16 @@
-"""Knowledge store — in-memory with optional JSON persistence.
+"""Knowledge store — SQLite-backed with full-text search.
 
-The store is the central registry for all ingested SKOs and supports
-tag-based lookup, full-text search, and bulk import/export.
+Replaces the previous in-memory dict + JSON file approach with
+a proper SQLite database. Supports efficient tag-based lookup,
+full-text search, and incremental saves.
 """
 
 from __future__ import annotations
 
 import json
+import sqlite3
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
 
 from deephunter.core.exceptions import StorageError
 from deephunter.knowledge.models import SecurityKnowledgeObject
@@ -16,23 +18,75 @@ from deephunter.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS skos (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    summary TEXT DEFAULT '',
+    source TEXT NOT NULL,
+    source_type TEXT DEFAULT 'other',
+    document_type TEXT DEFAULT 'unknown',
+    author TEXT,
+    created TEXT NOT NULL,
+    updated TEXT NOT NULL,
+    tags TEXT DEFAULT '[]',
+    technology TEXT DEFAULT '[]',
+    framework TEXT DEFAULT '[]',
+    language TEXT DEFAULT '[]',
+    cloud_provider TEXT DEFAULT '[]',
+    bug_classes TEXT DEFAULT '[]',
+    authentication TEXT DEFAULT '[]',
+    trust_boundaries TEXT DEFAULT '[]',
+    interesting_headers TEXT DEFAULT '[]',
+    interesting_parameters TEXT DEFAULT '[]',
+    high_level_testing_ideas TEXT DEFAULT '[]',
+    related_frameworks TEXT DEFAULT '[]',
+    related_bug_classes TEXT DEFAULT '[]',
+    related_writeups TEXT DEFAULT '[]',
+    related_cves TEXT DEFAULT '[]',
+    refs TEXT DEFAULT '[]',
+    confidence TEXT DEFAULT 'unknown',
+    raw_content TEXT,
+    metadata TEXT DEFAULT '[]'
+);
+
+CREATE TABLE IF NOT EXISTS tag_index (
+    tag TEXT NOT NULL,
+    sko_id TEXT NOT NULL REFERENCES skos(id) ON DELETE CASCADE,
+    PRIMARY KEY (tag, sko_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tag_index_tag ON tag_index(tag);
+CREATE INDEX IF NOT EXISTS idx_skos_source_type ON skos(source_type);
+CREATE INDEX IF NOT EXISTS idx_skos_bug_classes ON skos(bug_classes);
+CREATE VIRTUAL TABLE IF NOT EXISTS skos_fts USING fts5(
+    title, summary, raw_content, content='skos', content_rowid='rowid'
+);
+"""
+
 
 class KnowledgeStore:
-    """In-memory store for SecurityKnowledgeObjects with JSON persistence.
+    """SQLite-backed store for SecurityKnowledgeObjects.
 
-    The store indexes SKOs by their ID and maintains a tag index
-    for efficient tag-based filtering.
+    Provides CRUD operations, tag-based lookup, full-text search,
+    and efficient persistence without loading everything into memory.
 
-    This is not thread-safe; callers must provide their own locking
-    if used from multiple threads.
+    Thread-safe for reads; writes should be serialized.
     """
 
-    def __init__(self, persist_path: Optional[str | Path] = None) -> None:
-        self._skos: Dict[str, SecurityKnowledgeObject] = {}
-        self._persist_path: Optional[Path] = (
-            Path(persist_path) if persist_path else None
-        )
-        self._tag_index: Dict[str, List[str]] = {}
+    def __init__(self, db_path: str | Path | None = None) -> None:
+        self._db_path = Path(db_path) if db_path else Path("~/.deephunter/store.db")
+        self._db_path = self._db_path.expanduser().resolve()
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn: sqlite3.Connection = sqlite3.connect(str(self._db_path))
+        self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA foreign_keys=ON")
+        self._init_schema()
+
+    def _init_schema(self) -> None:
+        self._conn.executescript(_SCHEMA_SQL)
+        self._conn.commit()
 
     # ------------------------------------------------------------------
     # CRUD
@@ -50,14 +104,18 @@ class KnowledgeStore:
         Raises:
             StorageError: If an SKO with the same ID already exists.
         """
-        if sko.id in self._skos:
+        existing = self._conn.execute(
+            "SELECT id FROM skos WHERE id = ?", (sko.id,)
+        ).fetchone()
+        if existing:
             raise StorageError(f"SKO with id '{sko.id}' already exists")
-        self._skos[sko.id] = sko
-        self._index_tags(sko)
+
+        self._insert_sko(sko)
+        self._conn.commit()
         logger.debug("Added SKO %s: %s", sko.id, sko.title)
         return sko.id
 
-    def add_batch(self, skos: Sequence[SecurityKnowledgeObject]) -> List[str]:
+    def add_batch(self, skos: Sequence[SecurityKnowledgeObject]) -> list[str]:
         """Add multiple SKOs atomically.
 
         Args:
@@ -69,18 +127,22 @@ class KnowledgeStore:
         Raises:
             StorageError: If any SKO's ID collides.
         """
-        ids: List[str] = []
+        ids: list[str] = []
         for sko in skos:
-            if sko.id in self._skos:
+            existing = self._conn.execute(
+                "SELECT id FROM skos WHERE id = ?", (sko.id,)
+            ).fetchone()
+            if existing:
                 raise StorageError(f"SKO with id '{sko.id}' already exists (batch)")
             ids.append(sko.id)
+
         for sko in skos:
-            self._skos[sko.id] = sko
-            self._index_tags(sko)
+            self._insert_sko(sko)
+        self._conn.commit()
         logger.debug("Added %d SKOs in batch", len(skos))
         return ids
 
-    def get(self, sko_id: str) -> Optional[SecurityKnowledgeObject]:
+    def get(self, sko_id: str) -> SecurityKnowledgeObject | None:
         """Retrieve an SKO by its ID.
 
         Args:
@@ -89,7 +151,10 @@ class KnowledgeStore:
         Returns:
             The SKO if found, otherwise ``None``.
         """
-        return self._skos.get(sko_id)
+        row = self._conn.execute(
+            "SELECT * FROM skos WHERE id = ?", (sko_id,)
+        ).fetchone()
+        return self._row_to_sko(row) if row else None
 
     def update(self, sko: SecurityKnowledgeObject) -> None:
         """Update an existing SKO in the store.
@@ -100,10 +165,15 @@ class KnowledgeStore:
         Raises:
             StorageError: If the SKO does not exist.
         """
-        if sko.id not in self._skos:
+        existing = self._conn.execute(
+            "SELECT id FROM skos WHERE id = ?", (sko.id,)
+        ).fetchone()
+        if not existing:
             raise StorageError(f"Cannot update: SKO '{sko.id}' not found")
-        self._skos[sko.id] = sko
-        self._rebuild_tag_index()
+
+        self._conn.execute("DELETE FROM tag_index WHERE sko_id = ?", (sko.id,))
+        self._update_sko(sko)
+        self._conn.commit()
         logger.debug("Updated SKO %s", sko.id)
 
     def delete(self, sko_id: str) -> bool:
@@ -115,26 +185,35 @@ class KnowledgeStore:
         Returns:
             ``True`` if the SKO was removed, ``False`` if not found.
         """
-        removed = self._skos.pop(sko_id, None)
-        if removed is not None:
-            self._rebuild_tag_index()
+        cursor = self._conn.execute("DELETE FROM skos WHERE id = ?", (sko_id,))
+        self._conn.commit()
+        removed = cursor.rowcount > 0
+        if removed:
             logger.debug("Deleted SKO %s", sko_id)
-            return True
-        return False
+        return removed
 
     def count(self) -> int:
         """Return the number of stored SKOs."""
-        return len(self._skos)
+        row = self._conn.execute("SELECT COUNT(*) as cnt FROM skos").fetchone()
+        return row["cnt"] if row else 0
 
-    def list_all(self) -> List[SecurityKnowledgeObject]:
-        """Return all SKOs in insertion order."""
-        return list(self._skos.values())
+    def list_all(self) -> list[SecurityKnowledgeObject]:
+        """Return all SKOs."""
+        rows = self._conn.execute("SELECT * FROM skos ORDER BY created").fetchall()
+        return [self._row_to_sko(r) for r in rows]
+
+    def clear(self) -> None:
+        """Remove all SKOs from the store."""
+        self._conn.execute("DELETE FROM tag_index")
+        self._conn.execute("DELETE FROM skos")
+        self._conn.commit()
+        logger.debug("Cleared store")
 
     # ------------------------------------------------------------------
     # Query
     # ------------------------------------------------------------------
 
-    def search_by_title(self, query: str, case_sensitive: bool = False) -> List[SecurityKnowledgeObject]:
+    def search_by_title(self, query: str, case_sensitive: bool = False) -> list[SecurityKnowledgeObject]:
         """Search SKOs whose title contains the query string.
 
         Args:
@@ -145,11 +224,18 @@ class KnowledgeStore:
             Matching SKOs.
         """
         if case_sensitive:
-            return [s for s in self._skos.values() if query in s.title]
-        q = query.lower()
-        return [s for s in self._skos.values() if q in s.title.lower()]
+            rows = self._conn.execute(
+                "SELECT * FROM skos WHERE title GLOB ?",
+                (f"*{query}*",),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM skos WHERE LOWER(title) LIKE LOWER(?)",
+                (f"%{query}%",),
+            ).fetchall()
+        return [self._row_to_sko(r) for r in rows]
 
-    def search_by_tag(self, tag: str) -> List[SecurityKnowledgeObject]:
+    def search_by_tag(self, tag: str) -> list[SecurityKnowledgeObject]:
         """Return all SKOs with a given tag.
 
         Args:
@@ -158,124 +244,167 @@ class KnowledgeStore:
         Returns:
             SKOs tagged with the given tag.
         """
-        ids = self._tag_index.get(tag.lower(), [])
-        return [self._skos[i] for i in ids if i in self._skos]
+        tag_lower = tag.lower()
+        rows = self._conn.execute(
+            """SELECT skos.* FROM skos
+               JOIN tag_index ON skos.id = tag_index.sko_id
+               WHERE tag_index.tag = ?""",
+            (tag_lower,),
+        ).fetchall()
+        return [self._row_to_sko(r) for r in rows]
 
-    def search_by_bug_class(self, bug_class: str) -> List[SecurityKnowledgeObject]:
+    def search_by_bug_class(self, bug_class: str) -> list[SecurityKnowledgeObject]:
         """Return all SKOs that reference a specific bug class.
 
         Args:
-            bug_class: The bug class name (case-insensitive enum value).
+            bug_class: The bug class name (case-insensitive).
 
         Returns:
             Matching SKOs.
         """
         q = bug_class.lower()
-        results: List[SecurityKnowledgeObject] = []
-        for sko in self._skos.values():
-            for bc in sko.bug_classes:
-                if bc.value.lower() == q:
-                    results.append(sko)
-                    break
-        return results
+        rows = self._conn.execute(
+            "SELECT * FROM skos WHERE LOWER(bug_classes) LIKE ?",
+            (f"%{q}%",),
+        ).fetchall()
+        return [self._row_to_sko(r) for r in rows]
 
-    def search_raw_content(self, query: str) -> List[SecurityKnowledgeObject]:
-        """Full-text search over SKO raw content.
+    def search_raw_content(self, query: str) -> list[SecurityKnowledgeObject]:
+        """Search SKO raw content using LIKE (case-insensitive).
 
         Args:
             query: Substring to search for in raw content.
 
         Returns:
-            SKOs whose raw content contains the query.
+            Matching SKOs.
         """
-        q = query.lower()
-        results: List[SecurityKnowledgeObject] = []
-        for sko in self._skos.values():
-            if sko.raw_content and q in sko.raw_content.lower():
-                results.append(sko)
-        return results
+        rows = self._conn.execute(
+            "SELECT * FROM skos WHERE LOWER(raw_content) LIKE LOWER(?)",
+            (f"%{query}%",),
+        ).fetchall()
+        return [self._row_to_sko(r) for r in rows]
 
-    def search_source_type(self, source_type: str) -> List[SecurityKnowledgeObject]:
+    def search_source_type(self, source_type: str) -> list[SecurityKnowledgeObject]:
+        """Return all SKOs with a given source type."""
         q = source_type.lower().replace("-", "_")
-        results: List[SecurityKnowledgeObject] = []
-        for sko in self._skos.values():
-            if sko.source_type.value.lower() == q:
-                results.append(sko)
-        return results
-
-    def clear(self) -> None:
-        """Remove all SKOs from the store."""
-        self._skos.clear()
-        self._tag_index.clear()
-        logger.debug("Cleared store")
+        rows = self._conn.execute(
+            "SELECT * FROM skos WHERE source_type = ?", (q,)
+        ).fetchall()
+        return [self._row_to_sko(r) for r in rows]
 
     # ------------------------------------------------------------------
-    # Persistence
+    # Persistence helpers
     # ------------------------------------------------------------------
 
-    def save(self, path: Optional[str | Path] = None) -> None:
-        """Persist all SKOs to a JSON file.
+    def save(self, path: str | Path | None = None) -> None:
+        """The SQLite store is auto-persisting. This is a no-op.
 
-        Args:
-            path: Destination path. Falls back to the path provided at init.
-
-        Raises:
-            StorageError: If no path is configured and none is provided.
+        Provided for backward compatibility with code that calls save().
         """
-        target = Path(path) if path else self._persist_path
-        if not target:
-            raise StorageError("No persist path configured")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        data = [sko.model_dump_for_storage() for sko in self._skos.values()]
-        with open(target, "w") as f:
-            json.dump(data, f, indent=2, default=str)
-        logger.info("Saved %d SKOs to %s", len(data), target)
+        logger.debug("SQLite store auto-persists; save() is a no-op")
 
-    def load(self, path: Optional[str | Path] = None) -> int:
-        """Load SKOs from a JSON file, replacing all current data.
+    def load(self, path: str | Path | None = None) -> int:
+        """The SQLite store is auto-loading. This is a no-op.
 
-        Args:
-            path: Source path. Falls back to the path provided at init.
-
-        Returns:
-            Number of SKOs loaded.
-
-        Raises:
-            StorageError: If the file cannot be read or parsed.
+        Provided for backward compatibility with code that calls load().
         """
-        target = Path(path) if path else self._persist_path
-        if not target:
-            raise StorageError("No persist path configured")
-        if not target.exists():
-            raise StorageError(f"Persist file not found: {target}")
-        try:
-            with open(target, "r") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            raise StorageError(f"Failed to load from {target}: {e}") from e
-
-        self._skos.clear()
-        self._tag_index.clear()
-        for item in data:
-            sko = SecurityKnowledgeObject.from_dict(item)
-            self._skos[sko.id] = sko
-            self._index_tags(sko)
-        logger.info("Loaded %d SKOs from %s", len(self._skos), target)
-        return len(self._skos)
+        return self.count()
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
-    def _index_tags(self, sko: SecurityKnowledgeObject) -> None:
-        for tag in sko.tags:
-            key = tag.lower()
-            if key not in self._tag_index:
-                self._tag_index[key] = []
-            if sko.id not in self._tag_index[key]:
-                self._tag_index[key].append(sko.id)
+    @staticmethod
+    def _map_data(data: dict) -> dict:
+        """Map Pydantic field names to SQL column names."""
+        mapping = {"references": "refs"}
+        return {mapping.get(k, k): v for k, v in data.items()}
 
-    def _rebuild_tag_index(self) -> None:
-        self._tag_index.clear()
-        for sko in self._skos.values():
-            self._index_tags(sko)
+    def _insert_sko(self, sko: SecurityKnowledgeObject) -> None:
+        data = self._map_data(self._flatten_for_sql(sko.model_dump(mode="json")))
+        self._conn.execute(
+            """INSERT INTO skos (
+                id, title, summary, source, source_type, document_type,
+                author, created, updated, tags, technology, framework,
+                language, cloud_provider, bug_classes, authentication,
+                trust_boundaries, interesting_headers, interesting_parameters,
+                high_level_testing_ideas, related_frameworks, related_bug_classes,
+                related_writeups, related_cves, refs, confidence,
+                raw_content, metadata
+            ) VALUES (
+                :id, :title, :summary, :source, :source_type, :document_type,
+                :author, :created, :updated, :tags, :technology, :framework,
+                :language, :cloud_provider, :bug_classes, :authentication,
+                :trust_boundaries, :interesting_headers, :interesting_parameters,
+                :high_level_testing_ideas, :related_frameworks, :related_bug_classes,
+                :related_writeups, :related_cves, :refs, :confidence,
+                :raw_content, :metadata
+            )""",
+            data,
+        )
+        for tag in sko.tags:
+            self._conn.execute(
+                "INSERT OR IGNORE INTO tag_index (tag, sko_id) VALUES (?, ?)",
+                (tag.lower(), sko.id),
+            )
+
+    def _update_sko(self, sko: SecurityKnowledgeObject) -> None:
+        data = self._map_data(self._flatten_for_sql(sko.model_dump(mode="json")))
+        self._conn.execute(
+            """UPDATE skos SET
+                title=:title, summary=:summary, source=:source,
+                source_type=:source_type, document_type=:document_type,
+                author=:author, created=:created, updated=:updated,
+                tags=:tags, technology=:technology, framework=:framework,
+                language=:language, cloud_provider=:cloud_provider,
+                bug_classes=:bug_classes, authentication=:authentication,
+                trust_boundaries=:trust_boundaries,
+                interesting_headers=:interesting_headers,
+                interesting_parameters=:interesting_parameters,
+                high_level_testing_ideas=:high_level_testing_ideas,
+                related_frameworks=:related_frameworks,
+                related_bug_classes=:related_bug_classes,
+                related_writeups=:related_writeups,
+                related_cves=:related_cves, refs=:refs,
+                confidence=:confidence, raw_content=:raw_content,
+                metadata=:metadata
+            WHERE id=:id""",
+            data,
+        )
+        for tag in sko.tags:
+            self._conn.execute(
+                "INSERT OR IGNORE INTO tag_index (tag, sko_id) VALUES (?, ?)",
+                (tag.lower(), sko.id),
+            )
+
+    @staticmethod
+    def _flatten_for_sql(data: dict) -> dict:
+        """Convert list/dict fields to JSON strings for SQLite storage."""
+        flat = {}
+        for key, value in data.items():
+            if isinstance(value, (list, dict)):
+                flat[key] = json.dumps(value, default=str)
+            else:
+                flat[key] = value
+        return flat
+
+    def _row_to_sko(self, row: sqlite3.Row) -> SecurityKnowledgeObject:
+        """Convert a SQLite row back to a SecurityKnowledgeObject."""
+        data = dict(row)
+        if "refs" in data:
+            data["references"] = data.pop("refs")
+        json_fields = {
+            "tags", "technology", "framework", "language", "cloud_provider",
+            "bug_classes", "authentication", "trust_boundaries",
+            "interesting_headers", "interesting_parameters",
+            "high_level_testing_ideas", "related_frameworks",
+            "related_bug_classes", "related_writeups", "related_cves",
+            "references", "metadata",
+        }
+        for field in json_fields:
+            if field in data and isinstance(data[field], str):
+                try:
+                    data[field] = json.loads(data[field])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+        return SecurityKnowledgeObject(**data)

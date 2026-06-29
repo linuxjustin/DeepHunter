@@ -5,11 +5,10 @@ Defines enums and value objects shared across all modules.
 
 from __future__ import annotations
 
-from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DocumentType(str, Enum):
@@ -152,18 +151,18 @@ class TestingIdea(BaseModel):
 
     description: str = Field(description="What to test")
     rationale: str = Field(description="Why this test is relevant")
-    bug_classes: List[BugClass] = Field(default_factory=list)
+    bug_classes: list[BugClass] = Field(default_factory=list)
     difficulty: str = Field(default="medium")
-    references: List[str] = Field(default_factory=list)
+    references: list[str] = Field(default_factory=list)
 
 
 class RelatedReference(BaseModel):
     """A reference to related knowledge."""
 
     title: str
-    url: Optional[str] = None
-    source: Optional[str] = None
-    description: Optional[str] = None
+    url: str | None = None
+    source: str | None = None
+    description: str | None = None
 
 
 class Metadata(BaseModel):
@@ -171,7 +170,6 @@ class Metadata(BaseModel):
 
     key: str
     value: Any
-    tags: List[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)

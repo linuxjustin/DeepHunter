@@ -6,14 +6,12 @@ Uses Click for command parsing and Rich for formatted output.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import click
 from rich.console import Console
 from rich.table import Table
 
 from deephunter.core.config import DeepHunterConfig
-from deephunter.core.types import DocumentType, SourceType
 from deephunter.ingestion.pipeline import IngestionPipeline
 from deephunter.knowledge.store import KnowledgeStore
 from deephunter.rag.embeddings import EmbeddingProviderFactory
@@ -39,7 +37,7 @@ console = Console()
     help="Override configured log level",
 )
 @click.pass_context
-def cli(ctx: click.Context, config: str, log_level: Optional[str]) -> None:
+def cli(ctx: click.Context, config: str, log_level: str | None) -> None:
     """DeepHunter — AI-assisted bug bounty research platform."""
     ctx.ensure_object(dict)
 
@@ -96,8 +94,8 @@ def ingest(ctx: click.Context, directories: tuple[str, ...]) -> None:
 def list_skos(
     ctx: click.Context,
     tag: tuple[str, ...],
-    bug_class: Optional[str],
-    source_type: Optional[str],
+    bug_class: str | None,
+    source_type: str | None,
 ) -> None:
     """List stored Security Knowledge Objects."""
     store: KnowledgeStore = ctx.obj["store"]

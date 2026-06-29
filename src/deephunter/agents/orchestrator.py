@@ -7,9 +7,9 @@ shared context propagation, and result aggregation.
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
-from deephunter.agents.base import Agent, AgentRegistry, AgentResult
+from deephunter.agents.base import AgentRegistry, AgentResult
 from deephunter.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -28,14 +28,15 @@ class AgentOrchestrator:
         results = orch.run_sequential(["KnowledgeAgent", "ReasoningAgent"], context)
     """
 
-    def __init__(self) -> None:
-        self._results: Dict[str, AgentResult] = {}
+    def __init__(self, agent_registry: AgentRegistry | None = None) -> None:
+        self._agent_registry = agent_registry or AgentRegistry()
+        self._results: dict[str, AgentResult] = {}
 
     def run_sequential(
         self,
-        agent_names: List[str],
-        context: Dict[str, Any],
-    ) -> List[AgentResult]:
+        agent_names: list[str],
+        context: dict[str, Any],
+    ) -> list[AgentResult]:
         """Run agents one after another, passing context forward.
 
         Args:
@@ -48,11 +49,11 @@ class AgentOrchestrator:
         Raises:
             ValueError: If an agent name is not registered.
         """
-        results: List[AgentResult] = []
+        results: list[AgentResult] = []
         current_context = dict(context)
 
         for name in agent_names:
-            agent_cls = AgentRegistry.get(name)
+            agent_cls = self._agent_registry.get(name)
             if agent_cls is None:
                 raise ValueError(f"Unknown agent: {name}")
 
@@ -82,9 +83,9 @@ class AgentOrchestrator:
 
     def run_parallel(
         self,
-        agent_names: List[str],
-        context: Dict[str, Any],
-    ) -> List[AgentResult]:
+        agent_names: list[str],
+        context: dict[str, Any],
+    ) -> list[AgentResult]:
         """Run agents in parallel (sequentially in current implementation).
 
         Args:
@@ -100,7 +101,7 @@ class AgentOrchestrator:
         """
         return self.run_sequential(agent_names, context)
 
-    def get_result(self, result_id: str) -> Optional[AgentResult]:
+    def get_result(self, result_id: str) -> AgentResult | None:
         """Retrieve a stored result by its ID."""
         return self._results.get(result_id)
 

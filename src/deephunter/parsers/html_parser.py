@@ -8,13 +8,12 @@ headings and structured content.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from bs4 import BeautifulSoup
 
 from deephunter.core.exceptions import ParsingError
 from deephunter.core.types import DocumentType
-from deephunter.parsers.base import ParseResult, Parser, ParserRegistry
+from deephunter.parsers.base import Parser, ParseResult
 
 
 class HTMLParser(Parser):
@@ -28,7 +27,7 @@ class HTMLParser(Parser):
         return {".html", ".htm", ".xhtml", ".xml"}
 
     def parse(
-        self, content: str | bytes, source_path: Optional[str] = None
+        self, content: str | bytes, source_path: str | None = None
     ) -> ParseResult:
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
@@ -67,6 +66,3 @@ class HTMLParser(Parser):
             metadata["title"] = title_tag.get_text(strip=True)
 
         return ParseResult(content=text, metadata=metadata, sections=sections)
-
-
-ParserRegistry.register(HTMLParser())

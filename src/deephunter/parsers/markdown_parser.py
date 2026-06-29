@@ -8,14 +8,13 @@ library to convert to HTML, then ``BeautifulSoup`` for text extraction.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import markdown
 from bs4 import BeautifulSoup
 
 from deephunter.core.exceptions import ParsingError
 from deephunter.core.types import DocumentType
-from deephunter.parsers.base import ParseResult, Parser, ParserRegistry
+from deephunter.parsers.base import Parser, ParseResult
 
 
 class MarkdownParser(Parser):
@@ -29,7 +28,7 @@ class MarkdownParser(Parser):
         return {".md", ".markdown", ".mdown"}
 
     def parse(
-        self, content: str | bytes, source_path: Optional[str] = None
+        self, content: str | bytes, source_path: str | None = None
     ) -> ParseResult:
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
@@ -70,6 +69,3 @@ class MarkdownParser(Parser):
             metadata["path"] = str(source_path_obj.resolve())
 
         return ParseResult(content=text, metadata=metadata, sections=sections)
-
-
-ParserRegistry.register(MarkdownParser())

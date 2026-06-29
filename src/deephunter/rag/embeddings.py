@@ -8,7 +8,6 @@ for offline operation.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
 
 from deephunter.core.config import RAGConfig
 from deephunter.core.exceptions import RetrievalError
@@ -32,7 +31,7 @@ class EmbeddingProvider(ABC):
     """
 
     @abstractmethod
-    def embed(self, text: str) -> List[float]:
+    def embed(self, text: str) -> list[float]:
         """Generate an embedding vector for a single text string.
 
         Args:
@@ -42,7 +41,7 @@ class EmbeddingProvider(ABC):
             A list of floats representing the embedding vector.
         """
 
-    def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for a batch of texts.
 
         The default implementation calls ``embed`` sequentially.
@@ -74,7 +73,7 @@ class RandomEmbeddingProvider(EmbeddingProvider):
             )
         self._dimension = dimension
 
-    def embed(self, text: str) -> List[float]:
+    def embed(self, text: str) -> list[float]:
         seed = hash(text) & 0xFFFFFFFF
         rng = np.random.default_rng(seed)
         vec = rng.random(self._dimension).astype(np.float64)
@@ -84,6 +83,38 @@ class RandomEmbeddingProvider(EmbeddingProvider):
     @property
     def dimension(self) -> int:
         return self._dimension
+
+
+class SentenceTransformerEmbeddingProvider(EmbeddingProvider):
+    """Local embedding provider using sentence-transformers.
+
+    Loads a model from HuggingFace or a local path. The model is
+    loaded lazily on first ``embed()`` call.
+    """
+
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
+        self._model_name = model_name
+        self._model = None
+
+    def _get_model(self):
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+            self._model = SentenceTransformer(self._model_name)
+        return self._model
+
+    def embed(self, text: str) -> list[float]:
+        model = self._get_model()
+        vec = model.encode(text, normalize_embeddings=True)
+        return vec.tolist()
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        model = self._get_model()
+        vectors = model.encode(texts, normalize_embeddings=True)
+        return [v.tolist() for v in vectors]
+
+    @property
+    def dimension(self) -> int:
+        return self._get_model().get_sentence_embedding_dimension()
 
 
 class EmbeddingProviderFactory:
@@ -112,5 +143,13 @@ class EmbeddingProviderFactory:
                 model,
             )
             return RandomEmbeddingProvider()
-        msg = f"Unsupported embedding model: {config.embedding_model}"
+        if "sentence-transformers" in model or any(
+            name in model for name in ["all-minilm", "all-mpnet", "multi-qa"]
+        ):
+            try:
+                return SentenceTransformerEmbeddingProvider(model_name=config.embedding_model)
+            except Exception as exc:
+                msg = f"Failed to load sentence-transformers model '{config.embedding_model}': {exc}"
+                raise RetrievalError(msg) from exc
+        msg = f"Unsupported embedding model: {config.embedding_model}. Supported: random, text-embedding-*, sentence-transformers/*"
         raise RetrievalError(msg)

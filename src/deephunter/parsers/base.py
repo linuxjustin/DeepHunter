@@ -9,7 +9,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Type
 
 from deephunter.core.types import DocumentType
 
@@ -24,8 +23,8 @@ class ParseResult:
     """
 
     content: str
-    metadata: Dict[str, str] = field(default_factory=dict)
-    sections: Dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, str] = field(default_factory=dict)
+    sections: dict[str, str] = field(default_factory=dict)
 
 
 class Parser(ABC):
@@ -41,7 +40,7 @@ class Parser(ABC):
         """The document type this parser can handle."""
 
     @abstractmethod
-    def parse(self, content: str | bytes, source_path: Optional[str] = None) -> ParseResult:
+    def parse(self, content: str | bytes, source_path: str | None = None) -> ParseResult:
         """Parse document content into structured text.
 
         Args:
@@ -73,10 +72,10 @@ class Parser(ABC):
 class ParserRegistry:
     """Registry mapping document types to parser implementations."""
 
-    _parsers: Dict[DocumentType, Parser] = {}
+    def __init__(self) -> None:
+        self._parsers: dict[DocumentType, Parser] = {}
 
-    @classmethod
-    def register(cls, parser: Parser) -> None:
+    def register(self, parser: Parser) -> None:
         """Register a parser instance.
 
         Args:
@@ -86,12 +85,11 @@ class ParserRegistry:
             ValueError: If a parser for the same type is already registered.
         """
         dt = parser.supported_type
-        if dt in cls._parsers:
-            raise ValueError(f"Parser for {dt} already registered: {type(cls._parsers[dt]).__name__}")
-        cls._parsers[dt] = parser
+        if dt in self._parsers:
+            raise ValueError(f"Parser for {dt} already registered: {type(self._parsers[dt]).__name__}")
+        self._parsers[dt] = parser
 
-    @classmethod
-    def get(cls, document_type: DocumentType) -> Optional[Parser]:
+    def get(self, document_type: DocumentType) -> Parser | None:
         """Get the registered parser for a document type.
 
         Args:
@@ -100,10 +98,9 @@ class ParserRegistry:
         Returns:
             The parser, or ``None`` if none is registered.
         """
-        return cls._parsers.get(document_type)
+        return self._parsers.get(document_type)
 
-    @classmethod
-    def get_for_path(cls, path: Path) -> Optional[Parser]:
+    def get_for_path(self, path: Path) -> Parser | None:
         """Find a parser that can handle the given file path.
 
         Args:
@@ -112,13 +109,12 @@ class ParserRegistry:
         Returns:
             The first matching parser, or ``None``.
         """
-        for parser in cls._parsers.values():
+        for parser in self._parsers.values():
             if parser.can_parse(path):
                 return parser
         return None
 
-    @classmethod
-    def get_for_extension(cls, ext: str) -> Optional[Parser]:
+    def get_for_extension(self, ext: str) -> Parser | None:
         """Find a parser for the given file extension.
 
         Args:
@@ -127,14 +123,12 @@ class ParserRegistry:
         Returns:
             The matching parser, or ``None``.
         """
-        return cls.get_for_path(Path(f"file.{ext.lstrip('.')}"))
+        return self.get_for_path(Path(f"file.{ext.lstrip('.')}"))
 
-    @classmethod
-    def list_types(cls) -> List[DocumentType]:
+    def list_types(self) -> list[DocumentType]:
         """List all registered document types."""
-        return list(cls._parsers.keys())
+        return list(self._parsers.keys())
 
-    @classmethod
-    def clear(cls) -> None:
+    def clear(self) -> None:
         """Clear all registered parsers (primarily for testing)."""
-        cls._parsers.clear()
+        self._parsers.clear()

@@ -6,9 +6,6 @@ KnowledgeStore's SKOs and supports cosine-similarity search.
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-
 from deephunter.core.config import RAGConfig
 from deephunter.core.exceptions import RetrievalError
 from deephunter.knowledge.models import SecurityKnowledgeObject
@@ -44,14 +41,14 @@ class Retriever:
         self,
         config: RAGConfig,
         store: KnowledgeStore,
-        embedding_provider: Optional[EmbeddingProvider] = None,
+        embedding_provider: EmbeddingProvider | None = None,
     ) -> None:
         self._config = config
         self._store = store
         self._embedding_provider = embedding_provider or (
             EmbeddingProviderFactory.create(config)
         )
-        self._index: Dict[str, List[float]] = {}
+        self._index: dict[str, list[float]] = {}
         self._indexed: bool = False
 
     def index(self) -> int:
@@ -84,9 +81,9 @@ class Retriever:
     def query(
         self,
         query: str,
-        top_k: Optional[int] = None,
-        threshold: Optional[float] = None,
-    ) -> List[Tuple[SecurityKnowledgeObject, float]]:
+        top_k: int | None = None,
+        threshold: float | None = None,
+    ) -> list[tuple[SecurityKnowledgeObject, float]]:
         """Retrieve the top-k SKOs most similar to the query.
 
         Args:
@@ -116,7 +113,7 @@ class Retriever:
             return []
         query_vec = query_vec / query_norm
 
-        scored: List[Tuple[str, float]] = []
+        scored: list[tuple[str, float]] = []
         for sko_id, vec in self._index.items():
             sv = np.array(vec)
             sv_norm = np.linalg.norm(sv)
@@ -126,7 +123,7 @@ class Retriever:
             scored.append((sko_id, similarity))
 
         scored.sort(key=lambda x: x[1], reverse=True)
-        results: List[Tuple[SecurityKnowledgeObject, float]] = []
+        results: list[tuple[SecurityKnowledgeObject, float]] = []
         for sko_id, score in scored:
             if score < t:
                 break

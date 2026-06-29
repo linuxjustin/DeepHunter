@@ -8,15 +8,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from deephunter.core.config import TrainingConfig
 from deephunter.core.exceptions import TrainingError
-from deephunter.knowledge.models import SecurityKnowledgeObject
 from deephunter.knowledge.store import KnowledgeStore
-from deephunter.reasoning.hypothesis import Hypothesis, HypothesisGenerator
+from deephunter.reasoning.hypothesis import HypothesisGenerator
 from deephunter.utils.files import ensure_dir
 from deephunter.utils.logging import get_logger
 
@@ -31,9 +29,9 @@ class DatasetSample:
     input: str
     output: str
     source: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "instruction": self.instruction,
             "input": self.input,
@@ -62,14 +60,14 @@ class DatasetBuilder:
     def __init__(
         self,
         store: KnowledgeStore,
-        hypothesis_generator: Optional[HypothesisGenerator] = None,
-        config: Optional[TrainingConfig] = None,
+        hypothesis_generator: HypothesisGenerator | None = None,
+        config: TrainingConfig | None = None,
     ) -> None:
         self._store = store
         self._hypothesis_generator = hypothesis_generator
         self._config = config or TrainingConfig()
 
-    def build_knowledge_samples(self) -> List[DatasetSample]:
+    def build_knowledge_samples(self) -> list[DatasetSample]:
         """Build QA samples from SKO summaries and content.
 
         Each SKO produces one or more samples:
@@ -79,7 +77,7 @@ class DatasetBuilder:
         Returns:
             List of DatasetSample objects.
         """
-        samples: List[DatasetSample] = []
+        samples: list[DatasetSample] = []
         for sko in self._store.list_all():
             content = sko.raw_content or f"{sko.title}: {sko.summary}"
             if not content.strip():
@@ -113,7 +111,7 @@ class DatasetBuilder:
         logger.info("Built %d knowledge samples", len(samples))
         return samples
 
-    def build_hypothesis_samples(self, context: str = "web application security") -> List[DatasetSample]:
+    def build_hypothesis_samples(self, context: str = "web application security") -> list[DatasetSample]:
         """Build samples from generated hypotheses.
 
         Args:
@@ -131,7 +129,7 @@ class DatasetBuilder:
             )
 
         hypotheses = self._hypothesis_generator.generate(context)
-        samples: List[DatasetSample] = []
+        samples: list[DatasetSample] = []
 
         for hyp in hypotheses:
             bc_str = ", ".join(b.value for b in hyp.bug_classes)
@@ -158,13 +156,13 @@ class DatasetBuilder:
         logger.info("Built %d hypothesis samples", len(samples))
         return samples
 
-    def build_text_samples(self) -> List[DatasetSample]:
+    def build_text_samples(self) -> list[DatasetSample]:
         """Build raw text samples from SKO content for continued pre-training.
 
         Returns:
             List of DatasetSample objects.
         """
-        samples: List[DatasetSample] = []
+        samples: list[DatasetSample] = []
         for sko in self._store.list_all():
             content = sko.raw_content
             if not content or len(content.strip()) < 100:
@@ -183,8 +181,8 @@ class DatasetBuilder:
 
     def save(
         self,
-        samples: List[DatasetSample],
-        output_path: Optional[str | Path] = None,
+        samples: list[DatasetSample],
+        output_path: str | Path | None = None,
     ) -> Path:
         """Save dataset samples to a JSONL file.
 

@@ -6,13 +6,9 @@ mentions from plain text.
 
 from __future__ import annotations
 
-import re
-from typing import Dict, List, Optional, Set
-
 from deephunter.core.types import (
     BugClass,
     CloudProvider,
-    SourceType,
     Technology,
 )
 
@@ -26,7 +22,7 @@ class MetadataExtractor:
     """
 
     # Technology keyword maps
-    TECHNOLOGY_PATTERNS: Dict[Technology, List[str]] = {
+    TECHNOLOGY_PATTERNS: dict[Technology, list[str]] = {
         Technology.NODEJS: ["node.js", "nodejs", "express.js", "npm"],
         Technology.REACT: ["react", "reactjs", "react.js", "jsx"],
         Technology.ANGULAR: ["angular", "angularjs", "angular.js"],
@@ -43,7 +39,7 @@ class MetadataExtractor:
     }
 
     # Bug class keyword maps
-    BUG_CLASS_PATTERNS: Dict[BugClass, List[str]] = {
+    BUG_CLASS_PATTERNS: dict[BugClass, list[str]] = {
         BugClass.SQL_INJECTION: [
             "sql injection", "sqli", "sql injection", "blind sql",
         ],
@@ -74,14 +70,14 @@ class MetadataExtractor:
     }
 
     # Cloud provider patterns
-    CLOUD_PATTERNS: Dict[CloudProvider, List[str]] = {
+    CLOUD_PATTERNS: dict[CloudProvider, list[str]] = {
         CloudProvider.AWS: ["aws", "amazon web services", "s3", "lambda", "ec2"],
         CloudProvider.AZURE: ["azure", "microsoft azure", "azure ad"],
         CloudProvider.GCP: ["gcp", "google cloud", "gcs", "gke"],
     }
 
     @classmethod
-    def extract_technologies(cls, text: str) -> List[Technology]:
+    def extract_technologies(cls, text: str) -> list[Technology]:
         """Detect technologies mentioned in the text.
 
         Args:
@@ -90,7 +86,7 @@ class MetadataExtractor:
         Returns:
             List of detected technologies (deduplicated).
         """
-        found: Set[Technology] = set()
+        found: set[Technology] = set()
         lower = text.lower()
         for tech, patterns in cls.TECHNOLOGY_PATTERNS.items():
             for pattern in patterns:
@@ -100,7 +96,7 @@ class MetadataExtractor:
         return sorted(found, key=lambda t: t.value)
 
     @classmethod
-    def extract_bug_classes(cls, text: str) -> List[BugClass]:
+    def extract_bug_classes(cls, text: str) -> list[BugClass]:
         """Detect bug classes mentioned in the text.
 
         Args:
@@ -109,7 +105,7 @@ class MetadataExtractor:
         Returns:
             List of detected bug classes (deduplicated).
         """
-        found: Set[BugClass] = set()
+        found: set[BugClass] = set()
         lower = text.lower()
         for bc, patterns in cls.BUG_CLASS_PATTERNS.items():
             for pattern in patterns:
@@ -119,7 +115,7 @@ class MetadataExtractor:
         return sorted(found, key=lambda b: b.value)
 
     @classmethod
-    def extract_cloud_providers(cls, text: str) -> List[CloudProvider]:
+    def extract_cloud_providers(cls, text: str) -> list[CloudProvider]:
         """Detect cloud providers mentioned in the text.
 
         Args:
@@ -128,7 +124,7 @@ class MetadataExtractor:
         Returns:
             List of detected cloud providers (deduplicated).
         """
-        found: Set[CloudProvider] = set()
+        found: set[CloudProvider] = set()
         lower = text.lower()
         for cp, patterns in cls.CLOUD_PATTERNS.items():
             for pattern in patterns:
@@ -138,7 +134,7 @@ class MetadataExtractor:
         return sorted(found, key=lambda c: c.value)
 
     @classmethod
-    def extract_all(cls, text: str) -> Dict[str, List[str]]:
+    def extract_all(cls, text: str) -> dict[str, list[str]]:
         """Run all extractors and return results as string lists.
 
         Args:

@@ -3,23 +3,18 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Generator
 
 import pytest
-import yaml
 
 from deephunter.core.config import DeepHunterConfig
 from deephunter.core.types import (
     BugClass,
     Confidence,
-    DocumentType,
     SourceType,
     Technology,
-    TestingIdea,
 )
-from deephunter.knowledge.models import SKOBuilder, SecurityKnowledgeObject
+from deephunter.knowledge.models import SecurityKnowledgeObject
 from deephunter.knowledge.store import KnowledgeStore
-from deephunter.parsers.base import ParserRegistry
 
 
 @pytest.fixture
@@ -36,55 +31,48 @@ def sample_config_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def empty_store() -> KnowledgeStore:
-    return KnowledgeStore()
+def empty_store(tmp_path: Path) -> KnowledgeStore:
+    return KnowledgeStore(str(tmp_path / "store.db"))
 
 
 @pytest.fixture
-def populated_store() -> KnowledgeStore:
-    store = KnowledgeStore()
+def populated_store(tmp_path: Path) -> KnowledgeStore:
+    store = KnowledgeStore(str(tmp_path / "store.db"))
 
-    sko1 = (
-        SKOBuilder()
-        .title("JWT Authentication Bypass")
-        .summary("Common JWT attacks including alg confusion and key confusion.")
-        .source("https://example.com/jwt")
-        .source_type(SourceType.OWASP)
-        .add_bug_class(BugClass.AUTH_BYPASS)
-        .add_technology(Technology.NODEJS)
-        .add_tag("jwt")
-        .add_tag("authentication")
-        .raw_content("JWT (JSON Web Tokens) are commonly used for authentication...")
-        .confidence(Confidence.HIGH)
-        .build()
+    sko1 = SecurityKnowledgeObject(
+        title="JWT Authentication Bypass",
+        summary="Common JWT attacks including alg confusion and key confusion.",
+        source="https://example.com/jwt",
+        source_type=SourceType.OWASP,
+        bug_classes=[BugClass.AUTH_BYPASS],
+        technology=[Technology.NODEJS],
+        tags=["jwt", "authentication"],
+        raw_content="JWT (JSON Web Tokens) are commonly used for authentication...",
+        confidence=Confidence.HIGH,
     )
 
-    sko2 = (
-        SKOBuilder()
-        .title("SQL Injection in REST APIs")
-        .summary("SQL injection techniques specific to REST API endpoints.")
-        .source("https://example.com/sqli")
-        .source_type(SourceType.PAYLOADS_ALL_THE_THINGS)
-        .add_bug_class(BugClass.SQL_INJECTION)
-        .add_technology(Technology.DJANGO)
-        .add_tag("sqli")
-        .raw_content("SQL injection remains a critical vulnerability...")
-        .confidence(Confidence.MEDIUM)
-        .build()
+    sko2 = SecurityKnowledgeObject(
+        title="SQL Injection in REST APIs",
+        summary="SQL injection techniques specific to REST API endpoints.",
+        source="https://example.com/sqli",
+        source_type=SourceType.PAYLOADS_ALL_THE_THINGS,
+        bug_classes=[BugClass.SQL_INJECTION],
+        technology=[Technology.DJANGO],
+        tags=["sqli"],
+        raw_content="SQL injection remains a critical vulnerability...",
+        confidence=Confidence.MEDIUM,
     )
 
-    sko3 = (
-        SKOBuilder()
-        .title("XSS Prevention Cheat Sheet")
-        .summary("Cross-site scripting prevention techniques and bypasses.")
-        .source("https://example.com/xss")
-        .source_type(SourceType.OWASP)
-        .add_bug_class(BugClass.XSS)
-        .add_technology(Technology.REACT)
-        .add_tag("xss")
-        .raw_content("Cross-site scripting (XSS) vulnerabilities allow attackers...")
-        .confidence(Confidence.HIGH)
-        .build()
+    sko3 = SecurityKnowledgeObject(
+        title="XSS Prevention Cheat Sheet",
+        summary="Cross-site scripting prevention techniques and bypasses.",
+        source="https://example.com/xss",
+        source_type=SourceType.OWASP,
+        bug_classes=[BugClass.XSS],
+        technology=[Technology.REACT],
+        tags=["xss"],
+        raw_content="Cross-site scripting (XSS) vulnerabilities allow attackers...",
+        confidence=Confidence.HIGH,
     )
 
     store.add_batch([sko1, sko2, sko3])
@@ -156,8 +144,3 @@ tags:
 """
 
 
-@pytest.fixture
-def clear_parser_registry() -> Generator:
-    ParserRegistry.clear()
-    yield
-    ParserRegistry.clear()

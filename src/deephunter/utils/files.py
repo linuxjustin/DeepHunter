@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -22,9 +21,9 @@ def ensure_dir(path: str | Path) -> Path:
 
 def list_files(
     directory: str | Path,
-    extensions: Optional[List[str]] = None,
+    extensions: list[str] | None = None,
     recursive: bool = True,
-) -> List[Path]:
+) -> list[Path]:
     """List files in a directory, optionally filtering by extension.
 
     Args:
