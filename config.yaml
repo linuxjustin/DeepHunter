@@ -1,0 +1,37 @@
+data_dir: ./knowledge
+output_dir: ./output
+log_level: INFO
+log_file: null
+parser:
+  enabled_parsers:
+  - markdown
+  - html
+  - json
+  - yaml
+  - pdf
+  max_file_size_bytes: 52428800
+ingestion:
+  watch_directories: []
+  batch_size: 10
+  deduplicate: true
+rag:
+  embedding_model: text-embedding-ada-002
+  top_k: 5
+  similarity_threshold: 0.7
+  vector_store_path: null
+reasoning:
+  hypothesis_limit: 10
+  min_confidence: 0.3
+  enable_framework_aware: true
+  enable_cloud_aware: true
+  enable_api_aware: true
+evaluation:
+  metrics:
+  - precision
+  - recall
+  - f1
+  - hit_rate
+training:
+  output_dir: ./datasets/processed
+  format: jsonl
+  max_samples: 10000

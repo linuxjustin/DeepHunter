@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project data
+knowledge/**/*
+!knowledge/**/.gitkeep
+datasets/**/*
+!datasets/**/.gitkeep
+models/**/*
+!models/**/.gitkeep
+configs/*.local.yaml
+configs/*.local.json
+
+# Logs
+*.log
+logs/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Vectors
+*.npy
+*.npz

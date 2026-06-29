@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deephunter"
+version = "0.1.0"
+description = "Modular AI-assisted bug bounty research platform"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "DeepHunter Contributors" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "markdown>=3.5",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+    "aiofiles>=23.0",
+    "rich>=13.0",
+    "click>=8.0",
+    "pathlib>=1.0.1",
+]
+
+[project.optional-dependencies]
+pdf = ["pypdf2>=3.0"]
+rag = ["numpy>=1.26"]
+web = ["fastapi>=0.100", "uvicorn>=0.23"]
+full = [
+    "deephunter[pdf]",
+    "deephunter[rag]",
+    "deephunter[web]",
+]
+
+[project.scripts]
+deephunter = "deephunter.cli.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["deephunter*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
