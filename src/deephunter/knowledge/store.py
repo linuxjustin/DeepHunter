@@ -7,13 +7,14 @@ full-text search, and incremental saves.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import json
 import sqlite3
 from collections.abc import Sequence
 from pathlib import Path
 
 from deephunter.core.exceptions import StorageError
-from deephunter.knowledge.models import SecurityKnowledgeObject
+from deephunter.knowledge.models import SecurityKnowledgeObject, SKOCurationStatus
 from deephunter.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -55,6 +56,11 @@ CREATE TABLE IF NOT EXISTS skos (
     related_cwes TEXT DEFAULT '[]',
     refs TEXT DEFAULT '[]',
     confidence TEXT DEFAULT 'unknown',
+    curation_status TEXT DEFAULT 'draft',
+    curator TEXT,
+    curation_notes TEXT DEFAULT '',
+    reviewed_by TEXT,
+    reviewed_at TEXT,
     raw_content TEXT,
     normalized_content TEXT,
     metadata TEXT DEFAULT '[]'
@@ -69,10 +75,21 @@ CREATE TABLE IF NOT EXISTS tag_index (
 CREATE INDEX IF NOT EXISTS idx_tag_index_tag ON tag_index(tag);
 CREATE INDEX IF NOT EXISTS idx_skos_source_type ON skos(source_type);
 CREATE INDEX IF NOT EXISTS idx_skos_bug_classes ON skos(bug_classes);
+CREATE INDEX IF NOT EXISTS idx_skos_curation_status ON skos(curation_status);
 CREATE VIRTUAL TABLE IF NOT EXISTS skos_fts USING fts5(
     title, summary, raw_content, content='skos', content_rowid='rowid'
 );
 """
+
+_CURATION_COLUMNS: list[str] = [
+    "curation_status",
+    "curator",
+    "curation_notes",
+    "reviewed_by",
+    "reviewed_at",
+]
+
+_CURATION_JSON_COLUMNS: set[str] = set()
 
 _NEW_COLUMNS: list[str] = [
     "schema_version",
@@ -86,6 +103,11 @@ _NEW_COLUMNS: list[str] = [
     "payload_references",
     "related_cwes",
     "normalized_content",
+    "curation_status",
+    "curator",
+    "curation_notes",
+    "reviewed_by",
+    "reviewed_at",
 ]
 
 # Mapping from Pydantic field name to SQL column name.
@@ -135,6 +157,7 @@ _INSERT_COLUMNS: list[str] = [
     "high_level_testing_ideas", "manual_test_checklist", "payload_references",
     "related_frameworks", "related_writeups",
     "related_cves", "related_cwes", "refs", "confidence",
+    "curation_status", "curator", "curation_notes", "reviewed_by", "reviewed_at",
     "raw_content", "normalized_content", "metadata",
 ]
 
@@ -148,6 +171,7 @@ _UPDATE_COLUMNS: list[str] = [
     "high_level_testing_ideas", "manual_test_checklist", "payload_references",
     "related_frameworks", "related_writeups",
     "related_cves", "related_cwes", "refs", "confidence",
+    "curation_status", "curator", "curation_notes", "reviewed_by", "reviewed_at",
     "raw_content", "normalized_content", "metadata",
 ]
 
@@ -305,6 +329,67 @@ class KnowledgeStore:
             "SELECT * FROM skos WHERE source_type = ?", (q,)
         ).fetchall()
         return [self._row_to_sko(r) for r in rows]
+
+    def get_by_curation_status(self, status: "SKOCurationStatus") -> list[SecurityKnowledgeObject]:
+        """Get all SKOs with a specific curation status."""
+        rows = self._conn.execute(
+            "SELECT * FROM skos WHERE curation_status = ?",
+            (status.value,),
+        ).fetchall()
+        return [self._row_to_sko(r) for r in rows]
+
+    def submit_for_review(self, sko_id: str, curator: str, notes: str = "") -> bool:
+        """Submit a SKO for review."""
+        sko = self.get(sko_id)
+        if not sko:
+            return False
+        sko.curation_status = SKOCurationStatus.UNDER_REVIEW
+        sko.curator = curator
+        sko.curation_notes = notes
+        self.update(sko)
+        return True
+
+    def approve_sko(self, sko_id: str, reviewer: str, notes: str = "") -> bool:
+        """Approve a SKO after review."""
+        sko = self.get(sko_id)
+        if not sko:
+            return False
+        sko.curation_status = SKOCurationStatus.APPROVED
+        sko.reviewed_by = reviewer
+        sko.reviewed_at = datetime.now(UTC)
+        if notes:
+            sko.curation_notes = notes
+        self.update(sko)
+        return True
+
+    def deprecate_sko(self, sko_id: str, reviewer: str, notes: str = "") -> bool:
+        """Mark a SKO as deprecated."""
+        sko = self.get(sko_id)
+        if not sko:
+            return False
+        sko.curation_status = SKOCurationStatus.DEPRECATED
+        sko.reviewed_by = reviewer
+        sko.reviewed_at = datetime.now(UTC)
+        if notes:
+            sko.curation_notes = notes
+        self.update(sko)
+        return True
+
+    def archive_sko(self, sko_id: str) -> bool:
+        """Archive a SKO."""
+        sko = self.get(sko_id)
+        if not sko:
+            return False
+        sko.curation_status = SKOCurationStatus.ARCHIVED
+        self.update(sko)
+        return True
+
+    def get_curation_summary(self) -> dict[str, int]:
+        """Get counts of SKOs by curation status."""
+        rows = self._conn.execute(
+            "SELECT curation_status, COUNT(*) as cnt FROM skos GROUP BY curation_status"
+        ).fetchall()
+        return {row["curation_status"]: row["cnt"] for row in rows}
 
     # ------------------------------------------------------------------
     # Persistence helpers

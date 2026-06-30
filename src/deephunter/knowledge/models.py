@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
+from enum import Enum
 from typing import Any
 from uuid import uuid4
 
@@ -49,6 +50,16 @@ from deephunter.core.types import (
 _SKO_ID_PATTERN = re.compile(r"^sko-[a-f0-9]{12}$")
 _URL_OR_PATH_PATTERN = re.compile(r"^(https?://|file://|/|[a-zA-Z]:\\).+")
 _SCHEMA_VERSION = 1
+
+
+class SKOCurationStatus(str, Enum):
+    """Curation workflow states for a Security Knowledge Object."""
+
+    DRAFT = "draft"
+    UNDER_REVIEW = "under_review"
+    APPROVED = "approved"
+    DEPRECATED = "deprecated"
+    ARCHIVED = "archived"
 
 
 class SecurityKnowledgeObject(BaseModel):
@@ -210,6 +221,28 @@ class SecurityKnowledgeObject(BaseModel):
     confidence: Confidence = Field(
         default=Confidence.UNKNOWN,
         description="Confidence in the SKO's accuracy and relevance",
+    )
+
+    # ── Curation workflow ──────────────────────────────────────────
+    curation_status: SKOCurationStatus = Field(
+        default=SKOCurationStatus.DRAFT,
+        description="Curation workflow state",
+    )
+    curator: str | None = Field(
+        default=None,
+        description="User who curated this SKO",
+    )
+    curation_notes: str = Field(
+        default="",
+        description="Notes from the curation review",
+    )
+    reviewed_by: str | None = Field(
+        default=None,
+        description="User who approved/deprecated this SKO",
+    )
+    reviewed_at: datetime | None = Field(
+        default=None,
+        description="When this SKO was reviewed",
     )
 
     # ── Raw & processed content ────────────────────────────────────

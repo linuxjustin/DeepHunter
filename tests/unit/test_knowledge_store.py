@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 from deephunter.core.exceptions import StorageError
-from deephunter.knowledge.models import SecurityKnowledgeObject
+from deephunter.knowledge.models import SecurityKnowledgeObject, SKOCurationStatus
 from deephunter.knowledge.store import KnowledgeStore
 
 
@@ -152,3 +153,171 @@ class TestKnowledgeStore:
     def test_save_no_path(self, empty_store) -> None:
         # SQLite store auto-persists; save() does not require a path
         empty_store.save()
+
+
+class TestCurationWorkflow:
+    def _make_sko(self, title: str, source: str = "https://test.com") -> SecurityKnowledgeObject:
+        return SecurityKnowledgeObject(title=title, source=source)
+
+    def test_default_curation_status_is_draft(self, empty_store) -> None:
+        sko = self._make_sko("Draft Test")
+        empty_store.add(sko)
+        retrieved = empty_store.get(sko.id)
+        assert retrieved is not None
+        assert retrieved.curation_status == SKOCurationStatus.DRAFT
+
+    def test_get_by_curation_status(self, empty_store) -> None:
+        sko1 = self._make_sko("Draft SKO")
+        sko2 = self._make_sko("Review SKO")
+        sko3 = self._make_sko("Approved SKO")
+        empty_store.add(sko1)
+        empty_store.add(sko2)
+        empty_store.add(sko3)
+
+        empty_store.submit_for_review(sko2.id, "alice", "Please review")
+        empty_store.approve_sko(sko3.id, "bob")
+
+        drafts = empty_store.get_by_curation_status(SKOCurationStatus.DRAFT)
+        assert len(drafts) == 1
+        assert drafts[0].title == "Draft SKO"
+
+        under_review = empty_store.get_by_curation_status(SKOCurationStatus.UNDER_REVIEW)
+        assert len(under_review) == 1
+        assert under_review[0].title == "Review SKO"
+
+        approved = empty_store.get_by_curation_status(SKOCurationStatus.APPROVED)
+        assert len(approved) == 1
+        assert approved[0].title == "Approved SKO"
+
+    def test_submit_for_review(self, empty_store) -> None:
+        sko = self._make_sko("Submit Test")
+        empty_store.add(sko)
+
+        result = empty_store.submit_for_review(sko.id, "alice", "Review me")
+        assert result is True
+
+        retrieved = empty_store.get(sko.id)
+        assert retrieved is not None
+        assert retrieved.curation_status == SKOCurationStatus.UNDER_REVIEW
+        assert retrieved.curator == "alice"
+        assert retrieved.curation_notes == "Review me"
+
+    def test_submit_for_review_nonexistent(self, empty_store) -> None:
+        result = empty_store.submit_for_review("nonexistent-id", "alice")
+        assert result is False
+
+    def test_approve_sko(self, empty_store) -> None:
+        sko = self._make_sko("Approve Test")
+        empty_store.add(sko)
+
+        result = empty_store.approve_sko(sko.id, "bob", "LGTM")
+        assert result is True
+
+        retrieved = empty_store.get(sko.id)
+        assert retrieved is not None
+        assert retrieved.curation_status == SKOCurationStatus.APPROVED
+        assert retrieved.reviewed_by == "bob"
+        assert retrieved.curation_notes == "LGTM"
+        assert retrieved.reviewed_at is not None
+
+    def test_approve_sko_with_notes_append(self, empty_store) -> None:
+        sko = self._make_sko("Approve Notes")
+        empty_store.add(sko)
+        empty_store.submit_for_review(sko.id, "alice", "Initial notes")
+
+        empty_store.approve_sko(sko.id, "bob")
+        retrieved = empty_store.get(sko.id)
+        assert retrieved is not None
+        assert retrieved.curation_status == SKOCurationStatus.APPROVED
+        assert retrieved.curation_notes == "Initial notes"
+
+    def test_approve_sko_nonexistent(self, empty_store) -> None:
+        result = empty_store.approve_sko("nonexistent-id", "bob")
+        assert result is False
+
+    def test_deprecate_sko(self, empty_store) -> None:
+        sko = self._make_sko("Deprecate Test")
+        empty_store.add(sko)
+        empty_store.approve_sko(sko.id, "bob")
+
+        result = empty_store.deprecate_sko(sko.id, "charlie", "Outdated")
+        assert result is True
+
+        retrieved = empty_store.get(sko.id)
+        assert retrieved is not None
+        assert retrieved.curation_status == SKOCurationStatus.DEPRECATED
+        assert retrieved.reviewed_by == "charlie"
+        assert retrieved.curation_notes == "Outdated"
+
+    def test_deprecate_sko_nonexistent(self, empty_store) -> None:
+        result = empty_store.deprecate_sko("nonexistent-id", "charlie")
+        assert result is False
+
+    def test_archive_sko(self, empty_store) -> None:
+        sko = self._make_sko("Archive Test")
+        empty_store.add(sko)
+
+        result = empty_store.archive_sko(sko.id)
+        assert result is True
+
+        retrieved = empty_store.get(sko.id)
+        assert retrieved is not None
+        assert retrieved.curation_status == SKOCurationStatus.ARCHIVED
+
+    def test_archive_sko_nonexistent(self, empty_store) -> None:
+        result = empty_store.archive_sko("nonexistent-id")
+        assert result is False
+
+    def test_full_curation_workflow(self, empty_store) -> None:
+        sko = self._make_sko("Full Workflow")
+        empty_store.add(sko)
+
+        assert empty_store.get(sko.id).curation_status == SKOCurationStatus.DRAFT
+
+        empty_store.submit_for_review(sko.id, "alice", "Ready for review")
+        assert empty_store.get(sko.id).curation_status == SKOCurationStatus.UNDER_REVIEW
+
+        empty_store.approve_sko(sko.id, "bob", "Looks good")
+        assert empty_store.get(sko.id).curation_status == SKOCurationStatus.APPROVED
+
+        empty_store.deprecate_sko(sko.id, "charlie", "Needs update")
+        assert empty_store.get(sko.id).curation_status == SKOCurationStatus.DEPRECATED
+
+        empty_store.archive_sko(sko.id)
+        assert empty_store.get(sko.id).curation_status == SKOCurationStatus.ARCHIVED
+
+    def test_get_curation_summary(self, empty_store) -> None:
+        sko1 = self._make_sko("Draft 1")
+        sko2 = self._make_sko("Draft 2")
+        sko3 = self._make_sko("Under Review")
+        sko4 = self._make_sko("Approved")
+        empty_store.add(sko1)
+        empty_store.add(sko2)
+        empty_store.add(sko3)
+        empty_store.add(sko4)
+
+        empty_store.submit_for_review(sko3.id, "alice")
+        empty_store.approve_sko(sko4.id, "bob")
+
+        summary = empty_store.get_curation_summary()
+        assert summary.get("draft") == 2
+        assert summary.get("under_review") == 1
+        assert summary.get("approved") == 1
+
+    def test_get_curation_summary_empty(self, empty_store) -> None:
+        summary = empty_store.get_curation_summary()
+        assert summary == {}
+
+    def test_curation_persists_after_reload(self, empty_store, tmp_path: Path) -> None:
+        sko = self._make_sko("Persist Test")
+        empty_store.add(sko)
+        empty_store.submit_for_review(sko.id, "alice", "Review me")
+        empty_store.approve_sko(sko.id, "bob", "LGTM")
+
+        new_store = KnowledgeStore(str(empty_store._db_path))
+        retrieved = new_store.get(sko.id)
+        assert retrieved is not None
+        assert retrieved.curation_status == SKOCurationStatus.APPROVED
+        assert retrieved.curator == "alice"
+        assert retrieved.reviewed_by == "bob"
+        assert retrieved.curation_notes == "LGTM"

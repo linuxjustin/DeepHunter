@@ -90,6 +90,9 @@ class TechnologyProfile(BaseModel):
 
     name: str
     version: str = ""
+    supported_versions: list[str] = Field(default_factory=list)
+    deprecated_versions: list[str] = Field(default_factory=list)
+    minimum_version: str = ""
     vendor: str = ""
     language: str = ""
     framework: str = ""
@@ -223,6 +226,16 @@ class KnowledgePack(BaseModel):
     # Investigation
     workflow: list[str] = Field(default_factory=list)
     checklists: list[ManualTestChecklistItem] = Field(default_factory=list)
+
+    # Version-specific guidance
+    version_specific_notes: dict[str, str] = Field(
+        default_factory=dict,
+        description="Version-specific investigation notes (version -> notes)",
+    )
+    version_specific_features: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Features introduced or changed per version (version -> [features])",
+    )
 
     # References
     references: list[dict[str, str]] = Field(default_factory=list)
