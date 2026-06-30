@@ -1,7 +1,7 @@
 # Investigation Report: Investigation Report: Investigation: https://example.com
 
 **Target:** https://example.com
-**Generated:** 2026-06-30T16:13:04.028655+00:00
+**Generated:** 2026-06-30T16:47:51.526888+00:00
 
 ## Executive Summary
 
@@ -40,7 +40,7 @@ Investigation of https://example.com completed (0/271 tasks done, 0 failed, 6 ev
 
 ## Investigation Timeline
 
-Investigation started: 2026-06-30T16:13:03.992434+00:00
+Investigation started: 2026-06-30T16:47:51.492861+00:00
 Current status: context_built
 Steps completed: 14
 Tasks created: 271
