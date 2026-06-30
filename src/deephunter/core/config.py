@@ -20,6 +20,8 @@ import yaml
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from deephunter.tools.config import ToolPluginConfig
+
 
 class ParserConfig(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
@@ -322,6 +324,7 @@ class DeepHunterConfig(BaseSettings):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     recon: ReconConfig = Field(default_factory=ReconConfig)
+    tool_plugins: ToolPluginConfig = Field(default_factory=ToolPluginConfig)
 
     @field_validator("log_level")
     @classmethod

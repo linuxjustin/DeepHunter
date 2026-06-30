@@ -59,3 +59,7 @@ class AgentError(DeepHunterError):
 
 class ReconError(DeepHunterError):
     """Raised when reconnaissance operations fail."""
+
+
+class ToolPluginError(DeepHunterError):
+    """Raised when tool plugin operations fail."""

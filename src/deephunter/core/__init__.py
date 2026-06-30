@@ -7,6 +7,7 @@ from deephunter.core.config import (
     PromptConfig,
     ReconConfig,
     RouterConfig,
+    ToolPluginConfig,
 )
 from deephunter.core.exceptions import (
     AgentError,
@@ -22,6 +23,7 @@ from deephunter.core.exceptions import (
     RetrievalError,
     RouterError,
     StorageError,
+    ToolPluginError,
     TrainingError,
 )
 from deephunter.core.types import (
@@ -51,6 +53,7 @@ __all__ = [
     "PromptConfig",
     "ReconConfig",
     "RouterConfig",
+    "ToolPluginConfig",
     "AgentError",
     "DeepHunterError",
     "ConfigurationError",
@@ -58,6 +61,7 @@ __all__ = [
     "PromptError",
     "ReconError",
     "RouterError",
+    "ToolPluginError",
     "ParsingError",
     "IngestionError",
     "StorageError",
