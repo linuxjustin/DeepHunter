@@ -56,7 +56,7 @@ def create_app(title: str = "DeepHunter API", version: str = "1.0.0", root_path:
         allow_headers=["*"],
     )
 
-    from deephunter.api.routes import health, projects, targets, reports, conversations, evidence, workspace
+    from deephunter.api.routes import health, projects, targets, reports, conversations, evidence, workspace, notebook, tasks, search, dashboard, timeline
 
     app.include_router(health.router, prefix="/api/v1", tags=["health"])
     app.include_router(projects.router, prefix="/api/v1", tags=["projects"])
@@ -65,6 +65,11 @@ def create_app(title: str = "DeepHunter API", version: str = "1.0.0", root_path:
     app.include_router(conversations.router, prefix="/api/v1", tags=["conversations"])
     app.include_router(evidence.router, prefix="/api/v1", tags=["evidence"])
     app.include_router(workspace.router, prefix="/api/v1", tags=["workspace"])
+    app.include_router(notebook.router, prefix="/api/v1", tags=["notebook"])
+    app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
+    app.include_router(search.router, prefix="/api/v1", tags=["search"])
+    app.include_router(dashboard.router, prefix="/api/v1", tags=["dashboard"])
+    app.include_router(timeline.router, prefix="/api/v1", tags=["timeline"])
 
     return app
 
