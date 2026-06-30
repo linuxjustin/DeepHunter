@@ -1,12 +1,14 @@
 """Core module — configuration, exceptions, and base types."""
 
 from deephunter.core.config import (
+    AgentConfig,
     ContextConfig,
     DeepHunterConfig,
     PromptConfig,
     RouterConfig,
 )
 from deephunter.core.exceptions import (
+    AgentError,
     ConfigurationError,
     ContextError,
     DeepHunterError,
@@ -41,10 +43,12 @@ from deephunter.core.types import (
 )
 
 __all__ = [
+    "AgentConfig",
     "ContextConfig",
     "DeepHunterConfig",
     "PromptConfig",
     "RouterConfig",
+    "AgentError",
     "DeepHunterError",
     "ConfigurationError",
     "ContextError",

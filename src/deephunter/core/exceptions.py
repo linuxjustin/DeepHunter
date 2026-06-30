@@ -51,3 +51,7 @@ class RouterError(DeepHunterError):
 
 class TrainingError(DeepHunterError):
     """Raised when dataset creation or model training fails."""
+
+
+class AgentError(DeepHunterError):
+    """Raised when agent operations fail."""

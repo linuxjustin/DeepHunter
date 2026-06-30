@@ -218,6 +218,29 @@ class PromptConfig(BaseSettings):
     template_directory: str = Field(default="")
 
 
+class AgentConfig(BaseSettings):
+    """Configuration for the Agent Orchestration Framework."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    enabled: bool = Field(default=True, description="Enable agent orchestration")
+    default_execution_strategy: str = Field(
+        default="sequential",
+        description="Default execution strategy: sequential, parallel, pipeline, conditional, fan_out, fan_in",
+    )
+    max_concurrency: int = Field(default=4, ge=1, le=128, description="Max parallel agent executions")
+    default_timeout: float = Field(default=300.0, ge=1.0, description="Default agent execution timeout")
+    max_retries: int = Field(default=3, ge=0, le=10, description="Max retries per agent")
+    retry_delay_seconds: float = Field(default=1.0, ge=0.0, description="Delay between retries")
+    enabled_agents: list[str] = Field(default_factory=list, description="Explicitly enabled agents (empty = all)")
+    disabled_agents: list[str] = Field(default_factory=list, description="Disabled agent names")
+    agent_priorities: dict[str, int] = Field(default_factory=dict, description="Per-agent priority overrides")
+    enable_event_bus: bool = Field(default=True, description="Enable agent event bus")
+    enable_metrics: bool = Field(default=True, description="Enable execution metrics")
+    use_model_router: bool = Field(default=False, description="Use ModelRouter for agent model selection")
+    use_context_engine: bool = Field(default=False, description="Use ContextEngine for shared context")
+
+
 class RouterConfig(BaseSettings):
     """Configuration for the Model Router & Provider Abstraction Layer."""
 
@@ -271,6 +294,7 @@ class DeepHunterConfig(BaseSettings):
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
+    agent: AgentConfig = Field(default_factory=AgentConfig)
 
     @field_validator("log_level")
     @classmethod
