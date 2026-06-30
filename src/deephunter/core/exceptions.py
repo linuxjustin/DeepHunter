@@ -45,5 +45,9 @@ class PromptError(DeepHunterError):
     """Raised when prompt builder operations fail."""
 
 
+class RouterError(DeepHunterError):
+    """Raised when model routing operations fail."""
+
+
 class TrainingError(DeepHunterError):
     """Raised when dataset creation or model training fails."""

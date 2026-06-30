@@ -4,6 +4,7 @@ from deephunter.core.config import (
     ContextConfig,
     DeepHunterConfig,
     PromptConfig,
+    RouterConfig,
 )
 from deephunter.core.exceptions import (
     ConfigurationError,
@@ -15,6 +16,7 @@ from deephunter.core.exceptions import (
     PromptError,
     ReasoningError,
     RetrievalError,
+    RouterError,
     StorageError,
     TrainingError,
 )
@@ -42,10 +44,12 @@ __all__ = [
     "ContextConfig",
     "DeepHunterConfig",
     "PromptConfig",
+    "RouterConfig",
     "DeepHunterError",
     "ConfigurationError",
     "ContextError",
     "PromptError",
+    "RouterError",
     "ParsingError",
     "IngestionError",
     "StorageError",

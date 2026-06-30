@@ -218,6 +218,26 @@ class PromptConfig(BaseSettings):
     template_directory: str = Field(default="")
 
 
+class RouterConfig(BaseSettings):
+    """Configuration for the Model Router & Provider Abstraction Layer."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    enabled: bool = Field(default=True)
+    default_provider: str = Field(default="ollama")
+    fallback_providers: list[str] = Field(default_factory=lambda: ["openai"])
+    enabled_providers: list[str] = Field(default_factory=lambda: ["ollama", "openai"])
+    disabled_providers: list[str] = Field(default_factory=list)
+    provider_priorities: dict[str, int] = Field(default_factory=dict)
+    task_provider_mapping: dict[str, str] = Field(default_factory=dict)
+    offline_mode: bool = Field(default=False)
+    simulation_mode: bool = Field(default=False)
+    dry_run: bool = Field(default=False)
+    max_fallback_attempts: int = Field(default=3, ge=0, le=10)
+    default_max_tokens: int = Field(default=4096, ge=1)
+    default_timeout: float = Field(default=120.0, ge=1.0)
+
+
 class DeepHunterConfig(BaseSettings):
     """Root configuration for the DeepHunter platform.
 
@@ -247,6 +267,7 @@ class DeepHunterConfig(BaseSettings):
     planning: PlanningConfig = Field(default_factory=PlanningConfig)
     context: ContextConfig = Field(default_factory=ContextConfig)
     prompt: PromptConfig = Field(default_factory=PromptConfig)
+    router: RouterConfig = Field(default_factory=RouterConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
