@@ -35,6 +35,34 @@ class ParserConfig(BaseSettings):
     )
 
 
+class APIConfig(BaseSettings):
+    """API server configuration — CORS, authentication, and rate limiting."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    allowed_origins: list[str] = Field(
+        default_factory=list,
+        description="Allowed CORS origins. Use '*' only for development.",
+    )
+    allow_credentials: bool = Field(
+        default=True,
+        description="Allow credentials in CORS (if True, cannot use '*' for origins)",
+    )
+    api_keys: list[str] = Field(
+        default_factory=list,
+        description="API keys for authentication. Empty list = auth disabled.",
+    )
+    rate_limit_per_minute: int = Field(
+        default=60,
+        ge=0,
+        description="Per-client rate limit (0 = disabled)",
+    )
+    excluded_paths: list[str] = Field(
+        default_factory=lambda: ["/health", "/health/ready", "/health/live", "/version", "/docs", "/redoc", "/openapi.json"],
+        description="Paths excluded from authentication",
+    )
+
+
 class DiscoveryConfig(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
@@ -334,6 +362,7 @@ class DeepHunterConfig(BaseSettings):
     log_level: str = Field(default="INFO")
     log_file: str | None = Field(default=None)
 
+    api: APIConfig = Field(default_factory=APIConfig)
     parser: ParserConfig = Field(default_factory=ParserConfig)
     ingestion: IngestionConfig = Field(default_factory=IngestionConfig)
     rag: RAGConfig = Field(default_factory=RAGConfig)

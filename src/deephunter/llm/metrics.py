@@ -162,6 +162,7 @@ class ProviderMetrics:
                     metrics.model,
                     metrics.cost_usd,
                 )
+                self._update_health_on_success()
 
     def record_failure(self) -> None:
         with self._lock:
@@ -172,27 +173,37 @@ class ProviderMetrics:
 
     def record_success(self) -> None:
         with self._lock:
-            if self.health_status == ProviderStatus.UNAVAILABLE:
-                self.health_status = ProviderStatus.DEGRADED
-            elif self.health_failures > 0:
+            self._update_health_on_success()
+
+    def _update_health_on_success(self) -> None:
+        """Update health status on successful request."""
+        if self.health_status == ProviderStatus.UNAVAILABLE:
+            self.health_status = ProviderStatus.DEGRADED
+        elif self.health_status in (ProviderStatus.UNKNOWN, ProviderStatus.DEGRADED):
+            if self.health_failures > 0:
                 self.health_failures = max(0, self.health_failures - 1)
-                if self.health_failures == 0:
-                    self.health_status = ProviderStatus.HEALTHY
+            if self.health_failures == 0:
+                self.health_status = ProviderStatus.HEALTHY
+
+    def _compute_latency_stats_unlocked(self) -> dict[str, float]:
+        """Compute latency stats. Caller must hold lock."""
+        if not self._request_times:
+            return {"avg_ms": 0.0, "p50_ms": 0.0, "p95_ms": 0.0, "p99_ms": 0.0, "min_ms": 0.0, "max_ms": 0.0, "count": 0}
+        times = sorted(self._request_times)
+        n = len(times)
+        return {
+            "avg_ms": self.total_latency_ms / max(1, self.total_requests - self.failed_requests),
+            "p50_ms": times[n // 2],
+            "p95_ms": times[int(n * 0.95)] if n > 1 else times[0],
+            "p99_ms": times[int(n * 0.99)] if n > 1 else times[0],
+            "min_ms": self.min_latency_ms if self.min_latency_ms != float("inf") else 0.0,
+            "max_ms": self.max_latency_ms,
+            "count": n,
+        }
 
     def get_latency_stats(self) -> dict[str, float]:
         with self._lock:
-            if not self._request_times:
-                return {"avg_ms": 0.0, "p50_ms": 0.0, "p95_ms": 0.0, "p99_ms": 0.0, "min_ms": 0.0, "max_ms": 0.0}
-            times = sorted(self._request_times)
-            n = len(times)
-            return {
-                "avg_ms": self.total_latency_ms / max(1, self.total_requests - self.failed_requests),
-                "p50_ms": times[n // 2],
-                "p95_ms": times[int(n * 0.95)] if n > 1 else times[0],
-                "p99_ms": times[int(n * 0.99)] if n > 1 else times[0],
-                "min_ms": self.min_latency_ms if self.min_latency_ms != float("inf") else 0.0,
-                "max_ms": self.max_latency_ms,
-            }
+            return self._compute_latency_stats_unlocked()
 
     def get_summary(self) -> dict[str, Any]:
         with self._lock:
@@ -204,7 +215,7 @@ class ProviderMetrics:
                 "success_requests": success,
                 "failed_requests": self.failed_requests,
                 "error_rate_pct": round(error_rate, 2),
-                "latency": self.get_latency_stats(),
+                "latency": self._compute_latency_stats_unlocked(),
                 "token_usage": self.token_usage.model_dump(),
                 "total_cost_usd": round(self.cost_tracker.total_cost, 6),
                 "last_request_at": self.last_request_at.isoformat() if self.last_request_at else None,

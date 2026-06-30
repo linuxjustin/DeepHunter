@@ -9,16 +9,12 @@ from pydantic import BaseModel, Field
 
 from deephunter.investigation.notebook.manager import NotebookManager
 from deephunter.investigation.notebook.models import (
-    BoardColumn,
-    BoardState,
     NoteStatus,
     NoteType,
     NotebookChecklist,
     NotebookChecklistItem,
     NotebookEntry,
     NotebookState,
-    TaskBoardManager,
-    TaskPriority,
 )
 from deephunter.workspace.manager import WorkspaceManager
 

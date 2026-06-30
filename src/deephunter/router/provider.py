@@ -15,7 +15,7 @@ from typing import Any
 
 from deephunter.router.models import ModelInfo, ModelResponse, ProviderMetadata, ProviderStatus
 
-from deephunter.llm.base import LLMProvider, LLMResponse
+from deephunter.llm.base import LLMMessage, LLMProvider, LLMResponse
 
 
 class ModelProvider(ABC):
@@ -149,9 +149,12 @@ class LegacyProviderAdapter(ModelProvider):
         max_tokens: int | None = None,
         model: str | None = None,
     ) -> ModelResponse:
+        messages: list[LLMMessage] = []
+        if system_prompt:
+            messages.append(LLMMessage(role="system", content=system_prompt))
+        messages.append(LLMMessage(role="user", content=prompt))
         llm_response: LLMResponse = self._provider.generate(
-            prompt=prompt,
-            system_prompt=system_prompt,
+            messages,
             temperature=temperature,
             max_tokens=max_tokens,
         )

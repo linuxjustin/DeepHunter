@@ -21,10 +21,9 @@ import re
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Generator
-from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from deephunter.core.exceptions import LLMError, RateLimitError
 from deephunter.utils.logging import get_logger
@@ -36,40 +35,36 @@ T = TypeVar("T", bound=BaseModel)
 # ── Data models ──────────────────────────────────────────────────────────────
 
 
-@dataclass
-class LLMMessage:
+class LLMMessage(BaseModel):
     """A single message in a chat conversation."""
 
-    role: str  # system, user, assistant, tool
+    role: str
     content: str
     tool_calls: list[dict] | None = None
     tool_call_id: str | None = None
     name: str | None = None
 
 
-@dataclass
-class ToolDefinition:
+class ToolDefinition(BaseModel):
     """Definition of a tool/function the model may call."""
 
     name: str
     description: str = ""
-    parameters: dict[str, Any] = field(default_factory=lambda: {"type": "object", "properties": {}})
+    parameters: dict[str, Any] = Field(default_factory=lambda: {"type": "object", "properties": {}})
 
 
-@dataclass
-class LLMResponse:
+class LLMResponse(BaseModel):
     """Complete response from an LLM provider."""
 
     content: str
     model: str
-    usage: dict[str, int] = field(default_factory=dict)
-    tool_calls: list[dict] = field(default_factory=list)
+    usage: dict[str, int] = Field(default_factory=dict)
+    tool_calls: list[dict] = Field(default_factory=list)
     finish_reason: str = ""
     raw: Any = None
 
 
-@dataclass
-class LLMChunk:
+class LLMChunk(BaseModel):
     """A streaming chunk from an LLM provider."""
 
     content: str = ""

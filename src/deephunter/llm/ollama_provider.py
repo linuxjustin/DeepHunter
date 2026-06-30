@@ -85,6 +85,11 @@ class OllamaProvider(LLMProvider):
             payload["options"]["num_predict"] = max_tokens
         if json_mode:
             payload["format"] = "json"
+        if tools:
+            payload["tools"] = [
+                {"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.parameters}}
+                for t in tools
+            ]
 
         try:
             with httpx.Client(timeout=self._timeout) as client:
@@ -94,7 +99,22 @@ class OllamaProvider(LLMProvider):
         except httpx.RequestError as exc:
             raise LLMError(f"Ollama request failed: {exc}") from exc
 
-        content = data.get("message", {}).get("content", "")
+        msg = data.get("message", {})
+        content = msg.get("content", "")
+
+        tool_calls: list[dict] = []
+        if msg.get("tool_calls"):
+            for tc in msg["tool_calls"]:
+                fn = tc.get("function", {})
+                tool_calls.append({
+                    "id": tc.get("id", f"call_{hash(fn.get('name', ''))}"),
+                    "type": "function",
+                    "function": {
+                        "name": fn.get("name", ""),
+                        "arguments": fn.get("arguments", {}),
+                    },
+                })
+
         return LLMResponse(
             content=content,
             model=data.get("model", self._model),
@@ -102,6 +122,7 @@ class OllamaProvider(LLMProvider):
                 "prompt_tokens": data.get("prompt_eval_count", 0),
                 "completion_tokens": data.get("eval_count", 0),
             },
+            tool_calls=tool_calls,
             raw=data,
         )
 
@@ -132,6 +153,11 @@ class OllamaProvider(LLMProvider):
             payload["options"]["num_predict"] = max_tokens
         if json_mode:
             payload["format"] = "json"
+        if tools:
+            payload["tools"] = [
+                {"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.parameters}}
+                for t in tools
+            ]
 
         try:
             with httpx.Client(timeout=self._timeout) as client:
@@ -147,21 +173,39 @@ class OllamaProvider(LLMProvider):
                         last_data = data
                         if "message" in data and "content" in data["message"]:
                             chunk = data["message"]["content"]
-                            full_content.append(chunk)
-                            yield LLMChunk(content=chunk)
+                            if chunk:
+                                full_content.append(chunk)
+                                yield LLMChunk(content=chunk)
                         if data.get("done"):
                             model_used = data.get("model", model_used)
                             break
         except httpx.RequestError as exc:
             raise LLMError(f"Ollama stream failed: {exc}") from exc
 
+        final_msg = last_data.get("message", {})
+        content = "".join(full_content)
+
+        tool_calls: list[dict] = []
+        if final_msg.get("tool_calls"):
+            for tc in final_msg["tool_calls"]:
+                fn = tc.get("function", {})
+                tool_calls.append({
+                    "id": tc.get("id", f"call_{hash(fn.get('name', ''))}"),
+                    "type": "function",
+                    "function": {
+                        "name": fn.get("name", ""),
+                        "arguments": fn.get("arguments", {}),
+                    },
+                })
+
         return LLMResponse(
-            content="".join(full_content),
+            content=content,
             model=model_used,
             usage={
                 "prompt_tokens": last_data.get("prompt_eval_count", 0),
                 "completion_tokens": last_data.get("eval_count", 0),
             },
+            tool_calls=tool_calls,
         )
 
     def check_health(self) -> bool:
