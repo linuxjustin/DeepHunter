@@ -220,6 +220,9 @@ class NotebookManager:
             archived_entries=archived,
         )
 
+    def export_to_dict(self) -> dict[str, Any]:
+        return self._state.model_dump_for_storage()
+
     def export_to_markdown(self) -> str:
         lines = ["# Investigation Notebook\n"]
         for entry in self._state.entries:
@@ -230,6 +233,3 @@ class NotebookManager:
                 lines.append(f"Tags: {', '.join(entry.tags)}\n")
             lines.append(f"_Created: {entry.created_at.isoformat()}_\n\n")
         return "\n".join(lines)
-
-def export_to_dict(self) -> dict[str, Any]:
-        return self._state.model_dump_for_storage()

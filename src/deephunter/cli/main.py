@@ -409,12 +409,105 @@ def plan(ctx: click.Context, target: str) -> None:
     console.print(f"[bold]Risk score:[/bold] {plan.risk.overall:.1f}/10.0")
 
 
-@cli.command()
+@cli.command("roadmap")
+@click.argument("target")
+@click.option("--path-name", default="", help="Filter to a specific investigation path name")
+@click.option("--min-priority", default=0.0, type=float, help="Minimum priority score (0.0-1.0)")
+@click.option("--phase", default="", help="Filter to a specific planning phase")
 @click.pass_context
-def roadmap(ctx: click.Context) -> None:
-    """Show the investigation roadmap from latest plan."""
-    console.print("[yellow]Roadmap command: Load the latest investigation plan and display ordered steps.[/yellow]")
-    console.print("Use 'deephunter plan <target>' first to generate a plan.")
+def roadmap(ctx: click.Context, target: str, path_name: str, min_priority: float, phase: str) -> None:
+    """Generate and display a detailed investigation roadmap for a target.
+
+    Shows the full investigation plan grouped by phase, with alternative
+    investigation paths, manual test guidance, and bug class coverage.
+
+    Use 'deephunter roadmap <target>' to generate a comprehensive roadmap.
+    Use 'deephunter plan <target>' for a compact table view.
+    """
+    from deephunter.reasoning.session import InvestigationSession
+    from deephunter.planning import Planner, PlanningPhase
+
+    console.print(f"[bold cyan]Generating investigation roadmap for:[/bold cyan] {target}")
+
+    session = InvestigationSession.new(target)
+    planner = Planner()
+    result = planner.plan_from_session(session)
+    plan = result.plan
+
+    if not plan.steps:
+        console.print("[yellow]No investigation steps generated. Add more context.[/yellow]")
+        return
+
+    phases_order = list(PlanningPhase)
+
+    if path_name:
+        matching = [p for p in plan.alternative_paths if path_name.lower() in p.name.lower()]
+        if matching:
+            path = matching[0]
+            steps = path.steps_in_path(plan.steps)
+            console.print(f"\n[bold cyan]📍 Path:[/bold cyan] {path.name}")
+            console.print(f"[dim]{path.description}[/dim]")
+            console.print(f"[green]Priority:[/green] {path.priority:.2f}  [yellow]Steps:[/yellow] {len(path.step_ids)}")
+        else:
+            console.print(f"[yellow]No path matching '{path_name}' found. Showing full plan.[/yellow]")
+            steps = plan.steps
+    else:
+        steps = plan.steps
+
+    if min_priority > 0:
+        steps = [s for s in steps if s.priority_score >= min_priority]
+        console.print(f"[dim]Filtered to steps with priority >= {min_priority}[/dim]")
+
+    if phase:
+        try:
+            phase_enum = PlanningPhase(phase.lower())
+            steps = [s for s in steps if s.phase == phase_enum]
+            console.print(f"[dim]Filtered to phase: {phase}[/dim]")
+        except ValueError:
+            console.print(f"[red]Unknown phase: {phase}[/red]")
+
+    console.print(f"\n[bold]Investigation Roadmap — {target}[/bold]")
+    console.print(f"[dim]Total steps: {len(steps)}  |  Est. hours: {sum(s.estimated_cost_hours for s in steps):.1f}  |  Risk: {plan.risk.overall:.1f}/10[/dim]")
+
+    grouped: dict[PlanningPhase, list] = {}
+    for step in steps:
+        grouped.setdefault(step.phase, []).append(step)
+
+    for phase_enum in phases_order:
+        if phase_enum not in grouped:
+            continue
+        phase_steps = grouped[phase_enum]
+        console.print(f"\n[bold cyan]━━ {phase_enum.value.upper()} ({len(phase_steps)} steps)[/bold cyan]")
+
+        for s in phase_steps:
+            risk_color = "red" if s.risk.overall >= 7 else "yellow" if s.risk.overall >= 4 else "green"
+            icon = "🔴" if s.priority_score >= 0.8 else "🟡" if s.priority_score >= 0.6 else "🟢"
+
+            console.print(f"  {icon} [{s.priority_score:.2f}] {s.title[:70]}")
+            if s.description and s.description != s.title:
+                for line in s.description[:120].split("\n"):
+                    console.print(f"     [dim]{line.strip()}[/dim]")
+
+            if s.recommended_tests:
+                console.print(f"     [magenta]🧪 Manual test:[/magenta] {s.recommended_tests[0].description[:80]}")
+                if s.recommended_tests[0].procedure:
+                    proc_lines = s.recommended_tests[0].procedure.split("\n")[:2]
+                    for pl in proc_lines:
+                        console.print(f"       [dim]→ {pl.strip()}[/dim]")
+
+            if s.bug_classes:
+                console.print(f"     [red]Bug classes:[/red] {', '.join(s.bug_classes)}")
+            console.print(f"     Risk: [{risk_color}]{s.risk.overall:.1f}[/{risk_color}]  Est: {s.estimated_cost_hours}h  Complex: {s.complexity:.1f}")
+
+    if plan.alternative_paths:
+        console.print(f"\n[bold cyan]━━ ALTERNATIVE PATHS ({len(plan.alternative_paths)})[/bold cyan]")
+        for ap in plan.alternative_paths:
+            console.print(f"  [bold]{ap.name}[/bold]  (priority: {ap.priority:.2f})")
+            if ap.description:
+                console.print(f"    {ap.description[:100]}")
+            console.print(f"    Phases: {', '.join(p.value for p in ap.phases[:4])}  |  Steps: {len(ap.step_ids)}  |  Recommended by: {', '.join(ap.recommended_by)}")
+
+    console.print(f"\n[dim]Plan ID: {plan.id}  |  Phases covered: {len(plan.phases_covered)}/{len(phases_order)}[/dim]")
 
 
 @cli.command()

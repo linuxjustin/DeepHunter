@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from deephunter.workspace.manager import WorkspaceManager
-from deephunter.workspace.models import Project, ProjectStatus
 
 router = APIRouter()
 
@@ -51,7 +50,7 @@ async def create_project(req: CreateProjectRequest) -> dict:
 async def get_project(project_id: str) -> dict:
     """Get a project by ID."""
     manager = WorkspaceManager()
-    manager.load_workspace("default") if False else None
+    manager.load_workspace("default")
     if manager.current_workspace is None:
         manager.create_workspace("Default")
     project = manager.get_project(project_id)

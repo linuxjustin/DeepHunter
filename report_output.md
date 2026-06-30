@@ -1,7 +1,7 @@
 # Investigation Report: Investigation Report: Investigation: https://example.com
 
 **Target:** https://example.com
-**Generated:** 2026-06-30T20:54:36.786190+00:00
+**Generated:** 2026-06-30T21:27:25.983962+00:00
 
 ## Executive Summary
 
@@ -36,11 +36,11 @@ Investigation of https://example.com completed (0/289 tasks done, 0 failed, 6 ev
 
 ## Methodology Applied
 
-**Selected Methodology Packs:** rest_api, session, oauth, business_logic, file_upload
+**Selected Methodology Packs:** Express, Next.js, Nuxt, Command Injection
 
 ## Investigation Timeline
 
-Investigation started: 2026-06-30T20:54:36.756482+00:00
+Investigation started: 2026-06-30T21:27:25.933591+00:00
 Current status: context_built
 Steps completed: 14
 Tasks created: 289

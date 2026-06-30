@@ -260,8 +260,6 @@ class InvestigationOrchestrator:
 
         state.status = InvestigationStatus.IN_PROGRESS
 
-        # Build dependency map
-        {s.id: s for s in workflow.steps}
         completed: set[str] = set()
 
         for step in workflow.steps:
@@ -480,8 +478,20 @@ class InvestigationOrchestrator:
             for pack in packs:
                 if pack.name not in selected:
                     selected.append(pack.name)
-        if not selected and state.scope.technologies == ["node.js", "express"]:
-            selected = ["express", "rest", "jwt", "oauth", "mongodb"]
+
+        if not selected:
+            from deephunter.knowledge.packs.base import KnowledgePackCategory
+            universal_categories = [
+                KnowledgePackCategory.API,
+                KnowledgePackCategory.AUTHENTICATION,
+                KnowledgePackCategory.AUTHORIZATION,
+                KnowledgePackCategory.BUSINESS_LOGIC,
+            ]
+            for cat in universal_categories:
+                for pack in registry.get_by_category(cat):
+                    if pack.name not in selected:
+                        selected.append(pack.name)
+
         state.selected_knowledge_packs = selected
         state.status = InvestigationStatus.KNOWLEDGE_PACKS_SELECTED
         return {"selected_packs": selected}
@@ -489,10 +499,31 @@ class InvestigationOrchestrator:
     def _handle_select_methodology(
         self, state: InvestigationSessionState, _step: WorkflowStepDefinition
     ) -> dict[str, Any]:
-        selected: list[str] = ["rest_api", "session", "oauth", "business_logic", "file_upload"]
-        state.selected_methodology_packs = selected
+        from deephunter.methodology.packs.registry import get_packs_by_technology
+
+        selected: list[str] = []
+        cross_cutting: list[str] = []
+
+        for tech in state.scope.technologies:
+            packs = get_packs_by_technology(tech)
+            for pack in packs:
+                if pack.name not in selected:
+                    selected.append(pack.name)
+
+        from deephunter.methodology.packs.base import PackCategory
+        from deephunter.methodology.packs.registry import _REGISTRY
+        if _REGISTRY.count() == 0:
+            from deephunter.methodology.packs.registry import load_all_packs
+            load_all_packs()
+
+        if not selected:
+            for pack in _REGISTRY.get_by_category(PackCategory.CROSS_CUTTING):
+                if pack.name not in cross_cutting:
+                    cross_cutting.append(pack.name)
+
+        state.selected_methodology_packs = selected or cross_cutting
         state.status = InvestigationStatus.METHODOLOGY_SELECTED
-        return {"selected_methodology_packs": selected}
+        return {"selected_methodology_packs": state.selected_methodology_packs}
 
     def _handle_generate_plan(
         self, state: InvestigationSessionState, _step: WorkflowStepDefinition

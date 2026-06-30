@@ -11,6 +11,7 @@ import shlex
 import shutil
 import subprocess
 import time
+from datetime import datetime, timedelta
 from typing import Any
 
 from deephunter.recon.plugin import PluginResult
@@ -111,7 +112,7 @@ class ToolExecutor:
 
                 elapsed = time.monotonic() - started
                 report.duration_ms = round(elapsed * 1000, 1)
-                report.finished_at = report.started_at
+                report.finished_at = report.started_at + timedelta(seconds=elapsed)
 
                 self._emit(ToolExecutionCompletedEvent(
                     plugin_name=plugin.name,

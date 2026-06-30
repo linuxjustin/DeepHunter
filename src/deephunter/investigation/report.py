@@ -45,7 +45,6 @@ class ReportGenerator:
             A populated InvestigationReport.
         """
         completed_tasks = self._state.get_tasks_by_status(TaskStatus.COMPLETED)
-        self._state.get_tasks_by_status(TaskStatus.FAILED)
 
         report = InvestigationReport(
             title=f"Investigation Report: {self._state.name or self._state.target}",

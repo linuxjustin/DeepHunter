@@ -142,6 +142,10 @@ class InvestigationPlan(BaseModel):
     target: str = ""
     investigation_id: str = ""
     steps: list[InvestigationStep] = Field(default_factory=list)
+    alternative_paths: list[InvestigationPath] = Field(
+        default_factory=list,
+        description="Alternative investigation paths derived from decision trees",
+    )
     total_estimated_hours: float = Field(default=0.0, ge=0.0)
     risk: RiskScore = Field(default_factory=RiskScore)
     overall_priority: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -253,6 +257,29 @@ class PlannerMetrics(BaseModel):
     average_priority: float = 0.0
     risk_score: float = 0.0
     elapsed_seconds: float = 0.0
+
+
+class InvestigationPath(BaseModel):
+    """A named alternative investigation path through the attack surface.
+
+    Paths represent different investigation strategies (e.g., "API-focused",
+    "Auth-focused", "Cloud-focused") derived from decision tree evaluation.
+    """
+
+    id: str = Field(default_factory=lambda: f"path-{uuid4().hex[:12]}")
+    name: str = Field(description="Human-readable path name, e.g. 'Auth-First Path'")
+    description: str = Field(default="", description="Why this path was recommended")
+    priority: float = Field(default=0.5, ge=0.0, le=1.0, description="Path priority vs other paths")
+    phases: list[PlanningPhase] = Field(default_factory=list, description="Phases in execution order")
+    step_ids: list[str] = Field(default_factory=list, description="InvestigationStep IDs in this path")
+    hypothesis_ids: list[str] = Field(default_factory=list, description="Hypotheses this path addresses")
+    recommended_by: list[str] = Field(default_factory=list, description="Pack names that recommended this path")
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+    def steps_in_path(self, all_steps: list[InvestigationStep]) -> list[InvestigationStep]:
+        """Return the subset of steps belonging to this path."""
+        step_map = {s.id: s for s in all_steps}
+        return [step_map[sid] for sid in self.step_ids if sid in step_map]
 
 
 class PlannerResult(BaseModel):

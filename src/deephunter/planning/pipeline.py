@@ -20,6 +20,7 @@ from deephunter.planning.events import (
     StepPrioritizedEvent,
 )
 from deephunter.planning.models import (
+    InvestigationPath,
     InvestigationPlan,
     InvestigationStep,
     PlanningPhase,
@@ -178,6 +179,76 @@ class SortAndGroupStage(PlanningStage):
         plan.recalculate()
 
 
+class BuildAlternativePathsStage(PlanningStage):
+    """Stage 5: Build alternative investigation paths from decision tree conclusions.
+
+    Steps with is_decision_tree_conclusion=True are grouped into named
+    InvestigationPath objects for analyst selection.
+    """
+
+    name = "build_alternative_paths"
+
+    def process(
+        self,
+        context: PlannerContext,
+        plan: InvestigationPlan,
+        event_bus: PlanningEventBus,
+    ) -> None:
+        tree_steps = [
+            s for s in plan.steps
+            if s.metadata.get("is_decision_tree_conclusion") is True
+        ]
+
+        if not tree_steps:
+            return
+
+        packs_map: dict[str, list[InvestigationStep]] = {}
+        for step in tree_steps:
+            pack_name = step.metadata.get("pack_name", "unknown")
+            packs_map.setdefault(pack_name, []).append(step)
+
+        for pack_name, steps in packs_map.items():
+            if not steps:
+                continue
+
+            phases_in_path = sorted(
+                {s.phase for s in steps},
+                key=lambda p: _PHASE_ORDER.index(p) if p in _PHASE_ORDER else 999,
+            )
+
+            avg_priority = sum(s.priority_score for s in steps) / len(steps)
+
+            path = InvestigationPath(
+                name=f"{pack_name} Decision Path",
+                description=(
+                    f"Adaptive investigation path from {pack_name} decision tree. "
+                    f"{len(steps)} specialized steps based on context-aware analysis."
+                ),
+                priority=avg_priority,
+                phases=phases_in_path,
+                step_ids=[s.id for s in steps],
+                hypothesis_ids=self._collect_hypothesis_ids(steps),
+                recommended_by=[pack_name],
+                metadata={
+                    "path_type": "decision_tree",
+                    "pack": pack_name,
+                    "step_count": str(len(steps)),
+                },
+            )
+            plan.alternative_paths.append(path)
+
+        plan.alternative_paths.sort(key=lambda p: -p.priority)
+
+    @staticmethod
+    def _collect_hypothesis_ids(steps: list[InvestigationStep]) -> list[str]:
+        ids: list[str] = []
+        for step in steps:
+            for hid in step.hypothesis_ids:
+                if hid not in ids:
+                    ids.append(hid)
+        return ids
+
+
 class EstimateCostStage(PlanningStage):
     """Stage 5: Estimate total investigation cost and risk."""
 
@@ -215,11 +286,13 @@ class PlanningPipeline:
         config: PlanningConfig | None = None,
     ) -> None:
         self._config = config or PlanningConfig()
+        self._rule_registry = registry or RuleRegistry.with_default_rules()
         self._stages: list[PlanningStage] = [
             LoadContextStage(),
-            EvaluateRulesStage(registry=registry),
+            EvaluateRulesStage(registry=self._rule_registry),
             PrioritizeStepsStage(engine=priority_engine),
             SortAndGroupStage(),
+            BuildAlternativePathsStage(),
             EstimateCostStage(),
         ]
 
@@ -274,11 +347,7 @@ class PlanningPipeline:
         plan.recalculate()
         elapsed = time.perf_counter() - start
 
-        metrics.total_rules_evaluated = (
-            len(RuleRegistry.with_default_rules().list_rules())
-            if not hasattr(self, "_rule_count_cache")
-            else 0
-        )
+        metrics.total_rules_evaluated = len(self._rule_registry.list_rules())
         metrics.total_candidates_generated = len(plan.steps)
         metrics.total_steps_produced = len(plan.steps)
         metrics.phases_covered = len(plan.phases_covered)
