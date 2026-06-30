@@ -468,10 +468,98 @@ class ReportPreparationRule(PlanningRule):
         ]
 
 
+class MethodologyRule(PlanningRule):
+    """Generate methodology-driven investigation steps.
+
+    Runs the methodology pipeline using the detected technologies, frameworks,
+    and attack surface areas from the planner context. Produces investigation
+    steps from the resulting checklist items with full methodology traceability.
+    """
+
+    name = "methodology"
+    description = "Generates methodology-driven investigation steps from framework profiles"
+    phase = PlanningPhase.FINGERPRINT
+    priority = 50
+
+    def evaluate(self, context: PlannerContext) -> list[InvestigationStep]:
+        from deephunter.methodology.pipeline import MethodologyPipeline
+
+        pipeline = MethodologyPipeline()
+
+        technologies = context.technologies
+        frameworks = context.frameworks
+        attack_surface = context.attack_surface_areas
+
+        result = pipeline.run(
+            technologies=technologies,
+            frameworks=frameworks,
+            attack_surface_areas=attack_surface,
+        )
+
+        # Store result as dict for downstream rules (avoid Pydantic Any issues)
+        object.__setattr__(context, "methodology_result", result.model_dump())
+
+        steps: list[InvestigationStep] = []
+        for cl in result.checklists:
+            for item in cl.items:
+                # Map checklist item priority to score
+                if item.priority.value == "critical":
+                    priority_score = 0.95
+                elif item.priority.value == "high":
+                    priority_score = 0.80
+                elif item.priority.value == "medium":
+                    priority_score = 0.55
+                else:
+                    priority_score = 0.30
+
+                risk = RiskScore(
+                    likelihood=7.0,
+                    impact=8.0,
+                    confidence=0.6,
+                )
+
+                step = InvestigationStep(
+                    phase=self.phase,
+                    title=item.objective,
+                    description=item.description,
+                    priority_score=priority_score,
+                    risk=risk,
+                    estimated_cost_hours=1.0,
+                    complexity=0.5,
+                    technologies=list(item.related_technologies),
+                    metadata={
+                        "methodology_id": cl.methodology_id,
+                        "checklist_item_id": item.id,
+                        "methodology_step_id": item.id,
+                    },
+                )
+
+                # Add manual tests from the methodology pipeline
+                for mt in result.manual_tests:
+                    if mt.checklist_item_id == item.id:
+                        step.recommended_tests.append(
+                            ManualTest(
+                                description=mt.description,
+                                procedure=mt.procedure,
+                                expected_result=mt.expected_result,
+                                bug_classes=[bc.value for bc in mt.bug_classes],
+                                priority=mt.priority,
+                                estimated_effort_hours=mt.estimated_effort_hours,
+                                methodology_id=mt.methodology_id,
+                                checklist_item_id=mt.checklist_item_id,
+                            )
+                        )
+
+                steps.append(step)
+
+        return steps
+
+
 _BUILTIN_RULES: list[type[PlanningRule]] = [
     ReconRule,
     TechnologyRule,
     FrameworkDetectionRule,
+    MethodologyRule,
     AuthenticationRule,
     AuthorizationRule,
     BugClassRule,

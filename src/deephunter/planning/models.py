@@ -101,6 +101,8 @@ class ManualTest(BaseModel):
     bug_classes: list[str] = Field(default_factory=list)
     priority: float = Field(default=0.0, ge=0.0, le=1.0)
     estimated_effort_hours: float = Field(default=0.0, ge=0.0)
+    methodology_id: str = ""
+    checklist_item_id: str = ""
 
 
 class InvestigationStep(BaseModel):
@@ -198,6 +200,8 @@ class PlannerContext(BaseModel):
     os: list[str] = Field(default_factory=list)
     programming_languages: list[str] = Field(default_factory=list)
     user_constraints: list[str] = Field(default_factory=list)
+    attack_surface_areas: list[str] = Field(default_factory=list)
+    methodology_result: dict | None = None
 
     @classmethod
     def from_session(cls, session: object) -> PlannerContext:
