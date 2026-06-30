@@ -240,13 +240,15 @@ def _import_framework_packs() -> None:
     from deephunter.knowledge.packs.framework import (
         laravel, nextjs, spring_boot, django, rails, express,
         fastapi, aspnet, flask, symfony, phoenix, nestjs, nuxt,
-        wordpress, drupal, magento,
+        wordpress, drupal, magento, php, nodejs, python, mongoose,
+        starlette,
     )
     for p in [
         laravel.PACK, nextjs.PACK, spring_boot.PACK, django.PACK,
         rails.PACK, express.PACK, fastapi.PACK, aspnet.PACK,
         flask.PACK, symfony.PACK, phoenix.PACK, nestjs.PACK, nuxt.PACK,
-        wordpress.PACK, drupal.PACK, magento.PACK,
+        wordpress.PACK, drupal.PACK, magento.PACK, php.PACK, nodejs.PACK,
+        python.PACK, mongoose.PACK, starlette.PACK,
     ]:
         _REGISTRY.register(p)
 

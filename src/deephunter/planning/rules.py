@@ -8,7 +8,6 @@ InvestigationStep candidates.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 from deephunter.planning.models import (
     InvestigationStep,
@@ -214,14 +213,17 @@ class BugClassRule(PlanningRule):
         "sql_injection": ("SQL Injection Testing", "Test all input vectors for SQL injection: parameterized queries, WAF bypass techniques, time-based and out-of-band detection.", 0.95),
         "xss": ("Cross-Site Scripting Testing", "Test all user-controlled inputs for reflected, stored, and DOM-based XSS with context-aware payloads.", 0.85),
         "csrf": ("CSRF Testing", "Review anti-CSRF token implementation, SameSite cookie attributes, and state-changing endpoints without tokens.", 0.75),
-        "ssrf": ("Server-Side Request Forgery Testing", "Test URL parameters, file uploads, and redirect following for SSRF. Include cloud metadata endpoints.", 0.90),
+        "ssrf": ("Server-Side Request Forgery Testing", "Test URL parameters, file uploads, and redirect following for SSRF. Include cloud metadata endpoints and internal port scanning.", 0.90),
         "rce": ("Remote Code Execution Testing", "Test input points that may reach dangerous functions: deserialization, eval(), file operations, and command execution.", 0.95),
+        "command_injection": ("Command Injection Testing", "Test exec, shell_exec, system, popen, and child_process calls for shell metacharacter injection. Identify blind OOB channels, argument vs shell injection, and filter bypass techniques.", 0.95),
         "lfi": ("Local File Inclusion Testing", "Test path traversal in file parameters, include paths, and template loading mechanisms.", 0.80),
         "idor": ("Insecure Direct Object Reference Testing", "Test object IDs in URLs, parameters, and API responses for horizontal and vertical privilege escalation.", 0.80),
         "auth_bypass": ("Authentication Bypass Testing", "Test for authentication bypass: direct page access, parameter manipulation, cookie tampering, and rate limit bypass.", 0.85),
         "deserialization": ("Deserialization Attack Testing", "Test for insecure deserialization in JSON, YAML, pickle, PHP serialized data, and Java serialized streams.", 0.90),
         "ssti": ("Server-Side Template Injection Testing", "Test template injection in user-controlled inputs that may be rendered by server-side template engines.", 0.85),
+        "race_conditions": ("Race Condition Testing", "Test TOCTOU patterns, concurrent request handling, session racing, file access race windows, and financial operation atomicity. Use concurrency testing tools to detect race windows.", 0.85),
         "business_logic": ("Business Logic Flaw Testing", "Test business logic workflows for abuse: discount manipulation, tier bypass, multi-step flow tampering, and race conditions.", 0.80),
+        "prototype_pollution": ("Prototype Pollution Testing", "Test JSON merge/clone operations for __proto__ and constructor.prototype pollution. Identify impact on hasOwnProperty checks and privilege escalation paths.", 0.90),
     }
 
     def evaluate(self, context: PlannerContext) -> list[InvestigationStep]:

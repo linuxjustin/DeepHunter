@@ -98,7 +98,7 @@ can be loaded by v1 code without changes.
 
 | Field                    | Type                               | Default | Description                             |
 |--------------------------|------------------------------------|---------|-----------------------------------------|
-| `high_level_testing_ideas` | `list[TestingIdea]`              | `[]`    | High-level testing ideas                |
+| `high_level_testing_ideas` | `list[TestChecklistItem]`       | `[]`    | High-level testing ideas                |
 | `manual_test_checklist`  | `list[ManualTestChecklistItem]`    | `[]`    | Step-by-step manual test checklist      |
 | `payload_references`     | `list[PayloadReference]`           | `[]`    | Specific payload strings for testing    |
 

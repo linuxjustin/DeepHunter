@@ -167,6 +167,9 @@ def _import_cross_cutting_packs() -> None:
         business_logic,
         cloud,
         microservices,
+        command_injection,
+        race_conditions,
+        ssrf,
     )
     _registry: list[MethodologyPack] = [
         graphql.PACK,
@@ -179,6 +182,9 @@ def _import_cross_cutting_packs() -> None:
         business_logic.PACK,
         cloud.PACK,
         microservices.PACK,
+        command_injection.PACK,
+        race_conditions.PACK,
+        ssrf.PACK,
     ]
     for p in _registry:
         _REGISTRY.register(p)

@@ -309,12 +309,12 @@ class TestPackRegistry:
 
 class TestModuleFunctions:
     def test_load_all_packs(self):
-        """Verify all 22 built-in packs load correctly."""
+        """Verify all 25 built-in packs load correctly."""
         from deephunter.methodology.packs.registry import _REGISTRY
         _REGISTRY.clear()
         load_all_packs()
         packs = list_all_packs()
-        assert len(packs) == 22
+        assert len(packs) == 25
 
     def test_all_packs_have_valid_data(self):
         """Every pack should have meaningful data, not placeholders."""
@@ -349,7 +349,7 @@ class TestModuleFunctions:
         _REGISTRY.clear()
         load_all_packs()
         cc_packs = get_packs_by_category(PackCategory.CROSS_CUTTING)
-        assert len(cc_packs) == 10
+        assert len(cc_packs) == 13
 
     def test_get_packs_by_technology_django(self):
         from deephunter.methodology.packs.registry import _REGISTRY

@@ -150,7 +150,7 @@ class TrustBoundary(BaseModel):
     )
 
 
-class TestingIdea(BaseModel):
+class TestChecklistItem(BaseModel):
     """A high-level testing idea derived from knowledge analysis."""
 
     description: str = Field(description="What to test")
@@ -158,6 +158,8 @@ class TestingIdea(BaseModel):
     bug_classes: list[BugClass] = Field(default_factory=list)
     difficulty: str = Field(default="medium")
     references: list[str] = Field(default_factory=list)
+
+    __test__ = False
 
 
 class RelatedReference(BaseModel):

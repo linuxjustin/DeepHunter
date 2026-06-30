@@ -43,7 +43,7 @@ from deephunter.core.types import (
     RelatedReference,
     SourceType,
     Technology,
-    TestingIdea,
+    TestChecklistItem,
     TrustBoundary,
 )
 
@@ -182,7 +182,7 @@ class SecurityKnowledgeObject(BaseModel):
     )
 
     # ── Testing guidance ───────────────────────────────────────────
-    high_level_testing_ideas: list[TestingIdea] = Field(
+    high_level_testing_ideas: list[TestChecklistItem] = Field(
         default_factory=list,
         description="High-level testing ideas derived from analysis",
     )

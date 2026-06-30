@@ -44,7 +44,7 @@ from deephunter.core.types import (
     RelatedReference,
     SourceType,
     Technology,
-    TestingIdea,
+    TestChecklistItem,
     TrustBoundary,
 )
 
@@ -82,7 +82,7 @@ __all__ = [
     "CloudProvider",
     "AuthMechanism",
     "TrustBoundary",
-    "TestingIdea",
+    "TestChecklistItem",
     "RelatedReference",
     "Metadata",
     "AttackSurfaceEntry",

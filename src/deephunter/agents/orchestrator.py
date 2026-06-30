@@ -2,11 +2,20 @@
 
 The orchestrator manages sequential and parallel execution of agents,
 shared context propagation, and result aggregation.
+
+.. deprecated::
+    AgentOrchestrator (v1) is deprecated. Use :class:`AgentOrchestratorV2`
+    from ``deephunter.agents.orchestrator_v2`` instead. v2 provides typed
+    execution plans, strategy selection, event bus, and dependency graph
+    support. Migration guide: replace ``run_sequential`` with
+    ``execute_sequential``, pass ``AgentExecutionContext`` instead of
+    ``dict[str, Any]``, and use ``AgentResponse`` instead of ``AgentResult``.
 """
 
 from __future__ import annotations
 
 import time
+import warnings
 from typing import Any
 
 from deephunter.agents.base import AgentRegistry, AgentResult
@@ -29,6 +38,11 @@ class AgentOrchestrator:
     """
 
     def __init__(self, agent_registry: AgentRegistry | None = None) -> None:
+        warnings.warn(
+            "AgentOrchestrator (v1) is deprecated. Use AgentOrchestratorV2 instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._agent_registry = agent_registry or AgentRegistry()
         self._results: dict[str, AgentResult] = {}
 

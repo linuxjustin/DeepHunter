@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from deephunter.search.models import (
     SearchQuery,
     SearchResponse,
-    SearchResultType,
     SearchScope,
 )
 from deephunter.search.service import SearchService
@@ -29,8 +28,32 @@ class QueryRequest(BaseModel):
     include_archived: bool = False
 
 
-@router.post("/", response_model=dict)
-async def search(req: QueryRequest) -> dict:
+class SearchResultItem(BaseModel):
+    result_type: str
+    result_id: str
+    title: str
+    description: str = ""
+    relevance_score: float
+
+
+class SearchResultsGetResponse(BaseModel):
+    query: str
+    total_results: int
+    results: list[SearchResultItem]
+    execution_time_ms: float
+
+
+class ScopeInfo(BaseModel):
+    value: str
+    description: str
+
+
+class SearchScopesResponse(BaseModel):
+    scopes: list[ScopeInfo]
+
+
+@router.post("/", response_model=SearchResponse)
+async def search(req: QueryRequest) -> SearchResponse:
     scopes = []
     for s in req.scopes:
         try:
@@ -50,37 +73,17 @@ async def search(req: QueryRequest) -> dict:
     )
 
     results = _search_service.search(sq)
-
-    return {
-        "query": results.query,
-        "total_results": results.total_results,
-        "results": [
-            {
-                "result_type": r.result_type.value,
-                "result_id": r.result_id,
-                "title": r.title,
-                "description": r.description,
-                "content_snippet": r.content_snippet,
-                "relevance_score": r.relevance_score,
-                "url_path": r.url_path,
-                "tags": r.tags,
-            }
-            for r in results.results
-        ],
-        "execution_time_ms": results.execution_time_ms,
-        "pagination": results.pagination,
-        "suggestions": results.suggestions,
-    }
+    return results
 
 
-@router.get("/", response_model=dict)
+@router.get("/", response_model=SearchResultsGetResponse)
 async def search_get(
     q: str,
     scope: str = "all",
     target_id: str = "",
     limit: int = 20,
     offset: int = 0,
-) -> dict:
+) -> SearchResultsGetResponse:
     scopes = []
     if scope == "all":
         scopes = [SearchScope.ALL]
@@ -99,33 +102,31 @@ async def search_get(
     )
 
     results = _search_service.search(sq)
-
-    return {
-        "query": results.query,
-        "total_results": results.total_results,
-        "results": [
-            {
-                "result_type": r.result_type.value,
-                "result_id": r.result_id,
-                "title": r.title,
-                "description": r.description,
-                "relevance_score": r.relevance_score,
-                "url_path": r.url_path,
-            }
+    return SearchResultsGetResponse(
+        query=results.query,
+        total_results=results.total_results,
+        results=[
+            SearchResultItem(
+                result_type=r.result_type.value,
+                result_id=r.result_id,
+                title=r.title,
+                description=r.description,
+                relevance_score=r.relevance_score,
+            )
             for r in results.results
         ],
-        "execution_time_ms": results.execution_time_ms,
-    }
+        execution_time_ms=results.execution_time_ms,
+    )
 
 
-@router.get("/scopes")
-async def get_search_scopes() -> dict:
-    return {
-        "scopes": [
-            {"value": s.value, "description": _scope_desc(s)}
+@router.get("/scopes", response_model=SearchScopesResponse)
+async def get_search_scopes() -> SearchScopesResponse:
+    return SearchScopesResponse(
+        scopes=[
+            ScopeInfo(value=s.value, description=_scope_desc(s))
             for s in SearchScope
         ]
-    }
+    )
 
 
 def _scope_desc(scope: SearchScope) -> str:

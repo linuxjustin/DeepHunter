@@ -26,6 +26,13 @@ from deephunter.evaluation.datasets.knowledge_graph import (
     KNOWLEDGE_GRAPH_DATASET_CLOUD,
     KNOWLEDGE_GRAPH_DATASET_GRAPH_TRAVERSAL,
 )
+from deephunter.evaluation.datasets.language_runtime import (
+    get_runtime_datasets,
+    get_runtime_dataset,
+    PHP_DATASET,
+    NODEJS_DATASET,
+    PYTHON_DATASET,
+)
 
 __all__ = [
     "GOLDEN_DATASET_SQLI_XSS",
@@ -46,4 +53,9 @@ __all__ = [
     "KNOWLEDGE_GRAPH_DATASET_DATABASE",
     "KNOWLEDGE_GRAPH_DATASET_CLOUD",
     "KNOWLEDGE_GRAPH_DATASET_GRAPH_TRAVERSAL",
+    "get_runtime_datasets",
+    "get_runtime_dataset",
+    "PHP_DATASET",
+    "NODEJS_DATASET",
+    "PYTHON_DATASET",
 ]

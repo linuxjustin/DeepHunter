@@ -16,7 +16,7 @@ from deephunter.core.types import (
     RelatedReference,
     SourceType,
     Technology,
-    TestingIdea,
+    TestChecklistItem,
 )
 from deephunter.knowledge.models import SecurityKnowledgeObject
 
@@ -49,7 +49,7 @@ class TestSecurityKnowledgeObject:
         assert Technology.NODEJS in sko.technology
 
     def test_create_with_references(self) -> None:
-        idea = TestingIdea(
+        idea = TestChecklistItem(
             description="Test for JWT none algorithm",
             rationale="JWT libraries often accept 'none'",
         )

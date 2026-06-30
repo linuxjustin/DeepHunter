@@ -1,11 +1,11 @@
 # Investigation Report: Investigation Report: Investigation: https://example.com
 
 **Target:** https://example.com
-**Generated:** 2026-06-30T19:58:38.481596+00:00
+**Generated:** 2026-06-30T20:54:36.786190+00:00
 
 ## Executive Summary
 
-Investigation of https://example.com completed (0/271 tasks done, 0 failed, 6 evidence records collected, 0 draft findings).
+Investigation of https://example.com completed (0/289 tasks done, 0 failed, 6 evidence records collected, 0 draft findings).
 
 ## Scope
 
@@ -32,7 +32,7 @@ Investigation of https://example.com completed (0/271 tasks done, 0 failed, 6 ev
 
 ## Attack Surface Summary
 
-**Observations collected:** 6 evidence records across 271 tasks.
+**Observations collected:** 6 evidence records across 289 tasks.
 
 ## Methodology Applied
 
@@ -40,10 +40,10 @@ Investigation of https://example.com completed (0/271 tasks done, 0 failed, 6 ev
 
 ## Investigation Timeline
 
-Investigation started: 2026-06-30T19:58:38.453262+00:00
+Investigation started: 2026-06-30T20:54:36.756482+00:00
 Current status: context_built
 Steps completed: 14
-Tasks created: 271
+Tasks created: 289
 
 ## Evidence
 
@@ -58,6 +58,7 @@ Tasks created: 271
 
 - Task 'Target Reconnaissance' is pending (recon)
 - Task '[Microservices] Test service discovery and registry exposure' is pending (recon)
+- Task '[SSRF] Test blind SSRF with OOB techniques' is pending (ssrf)
 - Task 'Authentication' is pending (authentication)
 - Task 'Authorization' is pending (authorization)
 - Task 'Input Validation' is pending (other)
@@ -78,6 +79,7 @@ Tasks created: 271
 - Task '[Session Management] Test concurrent session handling' is pending (authentication)
 - Task '[Microservices] Test inter-service authentication' is pending (authentication)
 - Task '[OIDC] Test SSO logout security' is pending (authentication)
+- Task '[Race Conditions] Test session race conditions and fixation' is pending (authentication)
 - Task '[jwt] Workflow 1: 1. Capture a JWT token from the application' is pending (authentication)
 - Task '[jwt] Workflow 2: 2. Decode the JWT to inspect header and payload claims' is pending (authentication)
 - Task '[jwt] Workflow 3: 3. Test alg=none: modify header to {'alg':'none'} and empty ' is pending (authentication)
@@ -132,11 +134,18 @@ Tasks created: 271
 - Task '[REST API] Test IDOR and authorization on API resources' is pending (authorization)
 - Task '[OAuth] Test authorization code interception' is pending (authorization)
 - Task '[Cloud Review] Review IAM/cloud permission configuration' is pending (authorization)
+- Task '[Race Conditions] Test race conditions in authentication and authorization' is pending (authentication)
 - Task '[Business Logic] Test multi-step workflow bypass' is pending (business_logic)
 - Task '[Business Logic] Test privilege tier/role escalation via logic' is pending (business_logic)
 - Task '[Business Logic] Test mass assignment/parameter manipulation in logic operations' is pending (business_logic)
+- Task '[Race Conditions] Identify state-changing operations vulnerable to race conditions' is pending (business_logic)
 - Task '[Business Logic] Test race conditions' is pending (business_logic)
+- Task '[Race Conditions] Test race conditions with concurrent requests' is pending (business_logic)
+- Task '[Race Conditions] Test race conditions in financial operations' is pending (business_logic)
 - Task '[JWT] Test algorithm confusion (alg=none)' is pending (other)
+- Task '[Command Injection] Identify command injection entry points' is pending (other)
+- Task '[Command Injection] Test basic command injection with metacharacters' is pending (other)
+- Task '[SSRF] Identify SSRF entry points' is pending (ssrf)
 - Task '[Microservices] Test distributed tracing exposure' is pending (other)
 - Task '[OAuth] Test CSRF via state parameter' is pending (other)
 - Task '[OIDC] Test token confusion (access token vs ID token)' is pending (other)
@@ -145,6 +154,8 @@ Tasks created: 271
 - Task '[File Upload] Test extension validation bypass' is pending (other)
 - Task '[File Upload] Test MIME type/content-type validation' is pending (other)
 - Task '[Business Logic] Test integer/currency manipulation' is pending (other)
+- Task '[Command Injection] Test blind command injection' is pending (other)
+- Task '[SSRF] Test SSRF for access to internal services' is pending (ssrf)
 - Task '[REST API] Test content-type negotiation and deserialization' is pending (api)
 - Task '[OAuth] Test PKCE implementation' is pending (other)
 - Task '[OAuth] Test token leakage via various channels' is pending (other)
@@ -154,6 +165,8 @@ Tasks created: 271
 - Task '[Business Logic] Test rate limiting circumvention' is pending (other)
 - Task '[Cloud Review] Review container/Docker security' is pending (cloud)
 - Task '[Microservices] Map service topology and inter-service communication' is pending (other)
+- Task '[Command Injection] Test argument injection vs shell injection' is pending (other)
+- Task '[SSRF] Test SSRF for internal port scanning' is pending (ssrf)
 - Task '[graphql] Schema Disclosure: Check if introspection query is enabled: query { __schema { ' is pending (graphql)
 - Task '[graphql] Information Disclosure: Check if /graphiql or /playground are accessible' is pending (graphql)
 - Task '[graphql] Denial of Service: Test for deep query nesting DoS with 10+ level nested querie' is pending (graphql)
@@ -276,12 +289,15 @@ Tasks created: 271
 - Task '[OIDC] Test ID token validation' is pending (other)
 - Task '[JWT] Test KID header injection' is pending (other)
 - Task '[JWT] Test JWK/JKU header injection' is pending (other)
+- Task '[Command Injection] Escalate to full RCE from command injection' is pending (rce)
 - Task '[Microservices] Check service mesh and sidecar configuration' is pending (other)
 - Task '[REST API] Test HTTP parameter pollution' is pending (api)
 - Task '[OIDC] Test claim manipulation' is pending (other)
 - Task '[Business Logic] Test state transition enforcement' is pending (rce)
 - Task '[Cloud Review] Review serverless function security' is pending (cloud)
 - Task '[Microservices] Test data consistency vulnerabilities' is pending (other)
+- Task '[Command Injection] Test for command injection filters and bypasses' is pending (other)
+- Task '[SSRF] Test SSRF filter bypasses' is pending (ssrf)
 - Task '[GraphQL] Perform full GraphQL introspection' is pending (api)
 - Task '[REST API] Enumerate all API endpoints and resources' is pending (api)
 - Task '[graphql] Knowledge Pack Analysis' is pending (api)
@@ -322,6 +338,8 @@ Tasks created: 271
 - Task '[File Upload] Test file size and quota limitations' is pending (file_upload)
 - Task '[File Upload] Test path traversal in filename' is pending (file_upload)
 - Task '[File Upload] Test polyglot file attacks' is pending (file_upload)
+- Task '[Race Conditions] Test TOCTOU in file operations' is pending (file_upload)
+- Task '[SSRF] Test SSRF against cloud metadata services' is pending (cloud)
 - Task '[Cloud Review] Identify cloud provider and exposed storage' is pending (cloud)
 - Task '[Cloud Review] Test cloud metadata service access (SSRF to IMDS)' is pending (cloud)
 - Task '[OAuth] Test scope escalation' is pending (other)
@@ -332,6 +350,7 @@ Tasks created: 271
 
 - [high] Target Reconnaissance (recon)
 - [high] [Microservices] Test service discovery and registry exposure (recon)
+- [high] [SSRF] Test blind SSRF with OOB techniques (ssrf)
 - [high] Authentication (authentication)
 - [high] Authorization (authorization)
 - [high] Input Validation (other)
@@ -352,6 +371,7 @@ Tasks created: 271
 - [high] [Session Management] Test concurrent session handling (authentication)
 - [high] [Microservices] Test inter-service authentication (authentication)
 - [high] [OIDC] Test SSO logout security (authentication)
+- [high] [Race Conditions] Test session race conditions and fixation (authentication)
 - [high] [jwt] Workflow 1: 1. Capture a JWT token from the application (authentication)
 - [high] [jwt] Workflow 2: 2. Decode the JWT to inspect header and payload claims (authentication)
 - [high] [jwt] Workflow 3: 3. Test alg=none: modify header to {'alg':'none'} and empty  (authentication)
@@ -406,11 +426,18 @@ Tasks created: 271
 - [high] [REST API] Test IDOR and authorization on API resources (authorization)
 - [high] [OAuth] Test authorization code interception (authorization)
 - [high] [Cloud Review] Review IAM/cloud permission configuration (authorization)
+- [high] [Race Conditions] Test race conditions in authentication and authorization (authentication)
 - [high] [Business Logic] Test multi-step workflow bypass (business_logic)
 - [high] [Business Logic] Test privilege tier/role escalation via logic (business_logic)
 - [high] [Business Logic] Test mass assignment/parameter manipulation in logic operations (business_logic)
+- [high] [Race Conditions] Identify state-changing operations vulnerable to race conditions (business_logic)
 - [high] [Business Logic] Test race conditions (business_logic)
+- [high] [Race Conditions] Test race conditions with concurrent requests (business_logic)
+- [high] [Race Conditions] Test race conditions in financial operations (business_logic)
 - [high] [JWT] Test algorithm confusion (alg=none) (other)
+- [high] [Command Injection] Identify command injection entry points (other)
+- [high] [Command Injection] Test basic command injection with metacharacters (other)
+- [high] [SSRF] Identify SSRF entry points (ssrf)
 - [high] [Microservices] Test distributed tracing exposure (other)
 - [high] [OAuth] Test CSRF via state parameter (other)
 - [high] [OIDC] Test token confusion (access token vs ID token) (other)
@@ -419,6 +446,8 @@ Tasks created: 271
 - [high] [File Upload] Test extension validation bypass (other)
 - [high] [File Upload] Test MIME type/content-type validation (other)
 - [high] [Business Logic] Test integer/currency manipulation (other)
+- [high] [Command Injection] Test blind command injection (other)
+- [high] [SSRF] Test SSRF for access to internal services (ssrf)
 - [high] [REST API] Test content-type negotiation and deserialization (api)
 - [high] [OAuth] Test PKCE implementation (other)
 - [high] [OAuth] Test token leakage via various channels (other)
@@ -428,6 +457,8 @@ Tasks created: 271
 - [high] [Business Logic] Test rate limiting circumvention (other)
 - [high] [Cloud Review] Review container/Docker security (cloud)
 - [high] [Microservices] Map service topology and inter-service communication (other)
+- [high] [Command Injection] Test argument injection vs shell injection (other)
+- [high] [SSRF] Test SSRF for internal port scanning (ssrf)
 - [high] [graphql] Schema Disclosure: Check if introspection query is enabled: query { __schema {  (graphql)
 - [high] [graphql] Information Disclosure: Check if /graphiql or /playground are accessible (graphql)
 - [high] [graphql] Denial of Service: Test for deep query nesting DoS with 10+ level nested querie (graphql)
@@ -550,12 +581,15 @@ Tasks created: 271
 - [high] [OIDC] Test ID token validation (other)
 - [high] [JWT] Test KID header injection (other)
 - [high] [JWT] Test JWK/JKU header injection (other)
+- [high] [Command Injection] Escalate to full RCE from command injection (rce)
 - [high] [Microservices] Check service mesh and sidecar configuration (other)
 - [high] [REST API] Test HTTP parameter pollution (api)
 - [high] [OIDC] Test claim manipulation (other)
 - [high] [Business Logic] Test state transition enforcement (rce)
 - [high] [Cloud Review] Review serverless function security (cloud)
 - [high] [Microservices] Test data consistency vulnerabilities (other)
+- [high] [Command Injection] Test for command injection filters and bypasses (other)
+- [high] [SSRF] Test SSRF filter bypasses (ssrf)
 - [high] [GraphQL] Perform full GraphQL introspection (api)
 - [high] [REST API] Enumerate all API endpoints and resources (api)
 - [high] [graphql] Knowledge Pack Analysis (api)
@@ -596,6 +630,8 @@ Tasks created: 271
 - [high] [File Upload] Test file size and quota limitations (file_upload)
 - [high] [File Upload] Test path traversal in filename (file_upload)
 - [high] [File Upload] Test polyglot file attacks (file_upload)
+- [high] [Race Conditions] Test TOCTOU in file operations (file_upload)
+- [high] [SSRF] Test SSRF against cloud metadata services (cloud)
 - [high] [Cloud Review] Identify cloud provider and exposed storage (cloud)
 - [high] [Cloud Review] Test cloud metadata service access (SSRF to IMDS) (cloud)
 - [high] [OAuth] Test scope escalation (other)

@@ -13,7 +13,7 @@ from deephunter.core.types import (
     RelatedReference,
     SourceType,
     Technology,
-    TestingIdea,
+    TestChecklistItem,
     TrustBoundary,
 )
 
@@ -74,23 +74,23 @@ class TestTrustBoundary:
         assert tb.sensitivity == "high"
 
 
-class TestTestingIdea:
+class TestTestChecklistItem:
     def test_create(self) -> None:
-        idea = TestingIdea(
+        item = TestChecklistItem(
             description="Test for JWT alg confusion",
             rationale="Many libraries default to 'none' algorithm",
             bug_classes=[BugClass.AUTH_BYPASS],
         )
-        assert idea.difficulty == "medium"
-        assert BugClass.AUTH_BYPASS in idea.bug_classes
+        assert item.difficulty == "medium"
+        assert BugClass.AUTH_BYPASS in item.bug_classes
 
     def test_with_references(self) -> None:
-        idea = TestingIdea(
+        item = TestChecklistItem(
             description="Test SQL injection",
             rationale="User input is reflected in queries",
             references=["https://example.com/sqli"],
         )
-        assert len(idea.references) == 1
+        assert len(item.references) == 1
 
 
 class TestRelatedReference:
