@@ -126,7 +126,7 @@ class TestRuleRegistry:
 
     def test_with_default_rules(self) -> None:
         reg = RuleRegistry.with_default_rules()
-        assert len(reg.list_rules()) == 14
+        assert len(reg.list_rules()) == 15  # 14 built-in + 1 KnowledgePackRule
 
 
 class TestReconRule:

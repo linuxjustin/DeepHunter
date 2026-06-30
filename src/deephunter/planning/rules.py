@@ -112,9 +112,12 @@ class RuleRegistry:
         registry = cls()
         for rule_cls in _BUILTIN_RULES:
             registry.register(rule_cls())
-        # Register MethodologyPackRule separately to avoid circular import
+        # Register MethodologyPackRule and KnowledgePackRule separately
+        # to avoid circular imports
         from deephunter.methodology.packs.integration import MethodologyPackRule  # noqa: E402
         registry.register(MethodologyPackRule())
+        from deephunter.knowledge.packs.integration import KnowledgePackRule  # noqa: E402
+        registry.register(KnowledgePackRule())
         return registry
 
 
