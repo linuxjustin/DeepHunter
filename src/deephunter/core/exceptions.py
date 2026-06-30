@@ -61,5 +61,13 @@ class ReconError(DeepHunterError):
     """Raised when reconnaissance operations fail."""
 
 
+class LLMError(DeepHunterError):
+    """Raised when LLM provider operations fail."""
+
+
+class RateLimitError(DeepHunterError):
+    """Raised when an API rate limit is exceeded."""
+
+
 class ToolPluginError(DeepHunterError):
     """Raised when tool plugin operations fail."""

@@ -106,6 +106,29 @@ class RAGConfig(BaseSettings):
     similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
     vector_store_path: str | None = Field(default=None)
 
+    enable_hybrid: bool = Field(default=True, description="Enable hybrid BM25 + vector search")
+    enable_reranking: bool = Field(default=True, description="Enable semantic re-ranking of results")
+    enable_metadata_filter: bool = Field(default=True, description="Enable metadata filtering")
+    enable_citations: bool = Field(default=True, description="Enable citation tracking")
+    enable_incremental_index: bool = Field(default=True, description="Enable incremental indexing")
+
+    bm25_weight: float = Field(default=0.5, ge=0.0, le=1.0, description="BM25 weight in hybrid search")
+    vector_weight: float = Field(default=0.5, ge=0.0, le=1.0, description="Vector weight in hybrid search")
+
+    rerank_top_k: int = Field(default=20, ge=1, le=200, description="Number of candidates to re-rank")
+    final_top_k: int = Field(default=5, ge=1, le=50, description="Final number of results after re-ranking")
+
+    chunk_size: int = Field(default=512, ge=64, le=8192, description="Target chunk size in tokens")
+    chunk_overlap: int = Field(default=64, ge=0, le=1024, description="Chunk overlap in tokens")
+    chunk_by_tokens: bool = Field(default=True, description="Chunk by tokens vs characters")
+
+    max_context_length: int = Field(default=4096, ge=256, le=32000, description="Max context length for compression")
+    compression_ratio: float = Field(default=0.5, ge=0.1, le=1.0, description="Target compression ratio")
+
+    citation_format: str = Field(default="markdown", description="Citation format: markdown, json, text")
+
+    index_update_batch_size: int = Field(default=100, ge=1, le=10000, description="Batch size for incremental indexing")
+
 
 class ReasoningConfig(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")

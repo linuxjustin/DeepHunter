@@ -12,6 +12,11 @@ from deephunter.evaluation.datasets.regression import (
     REGRESSION_DATASET_METHODOLOGY,
     REGRESSION_DATASET_TECH_INTEL,
 )
+from deephunter.evaluation.datasets.app_benchmarks import (
+    get_app_benchmarks,
+    get_app_benchmark,
+    APP_BENCHMARKS,
+)
 
 __all__ = [
     "GOLDEN_DATASET_SQLI_XSS",
@@ -22,4 +27,7 @@ __all__ = [
     "REGRESSION_DATASET_PLANNER",
     "REGRESSION_DATASET_METHODOLOGY",
     "REGRESSION_DATASET_TECH_INTEL",
+    "get_app_benchmarks",
+    "get_app_benchmark",
+    "APP_BENCHMARKS",
 ]
