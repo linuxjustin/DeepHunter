@@ -229,16 +229,16 @@ class PlannerContext(BaseModel):
             interesting_parameters=state.interesting_parameters,
             bug_classes=list(
                 set(
-                    bc
+                    str(bc)
                     for hyp in state.hypotheses
-                    for bc in hyp.get("bug_classes", [])
+                    for bc in hyp.bug_classes
                 )
             ),
             os=fp.operating_systems,
             programming_languages=fp.programming_languages,
             observation_types=[o.type.value for o in state.observations],
             existing_findings=[f.title for f in state.findings],
-            existing_hypotheses=[h.get("title", "") for h in state.hypotheses],
+            existing_hypotheses=[h.title for h in state.hypotheses],
         )
 
 

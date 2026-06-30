@@ -171,6 +171,40 @@ class ManualNote(BaseModel):
 # ── Investigation Session State ──────────────────────────────────────────────
 
 
+class WorkflowVariableType(StrEnum):
+    STRING = "string"
+    LIST = "list"
+    BOOL = "bool"
+    INTEGER = "integer"
+
+
+class WorkflowVariable(BaseModel):
+    """A typed workflow variable resolved from context or input."""
+
+    name: str
+    type: WorkflowVariableType = WorkflowVariableType.STRING
+    default: Any = ""
+    description: str = ""
+    required: bool = False
+
+
+class WorkflowVariables(BaseModel):
+    """Runtime values for workflow variables."""
+
+    framework: str = ""
+    technologies: list[str] = Field(default_factory=list)
+    cloud_provider: str = ""
+    auth_method: str = ""
+    graphql_enabled: bool = False
+    api_present: bool = False
+    websocket_enabled: bool = False
+    sso_enabled: bool = False
+    admin_panel_detected: bool = False
+    planner_confidence: float = 0.0
+    attack_surface_metadata: dict[str, Any] = Field(default_factory=dict)
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+
 class InvestigationStatus(StrEnum):
     CREATED = "created"
     SCOPE_LOADED = "scope_loaded"
@@ -185,6 +219,37 @@ class InvestigationStatus(StrEnum):
     PAUSED = "paused"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+# ── Workflow Metrics ─────────────────────────────────────────────────────────
+
+
+class WorkflowMetrics(BaseModel):
+    """Real-time tracking metrics for a running workflow."""
+
+    total_phases: int = 0
+    completed_phases: int = 0
+    total_steps: int = 0
+    completed_steps: int = 0
+    estimated_remaining_minutes: float = 0.0
+    evidence_count: int = 0
+    evidence_coverage: float = 0.0
+    checklist_coverage: float = 0.0
+    planner_confidence: float = 0.0
+    outstanding_tasks: int = 0
+    phase_metrics: dict[str, "PhaseMetrics"] = Field(default_factory=dict)
+
+
+class PhaseMetrics(BaseModel):
+    """Metrics for a single phase."""
+
+    phase_id: str
+    total_steps: int = 0
+    completed_steps: int = 0
+    estimated_minutes: int = 0
+    evidence_collected: int = 0
+    evidence_required: int = 0
+    completion_pct: float = 0.0
 
 
 class InvestigationSessionState(BaseModel):
@@ -231,43 +296,6 @@ class InvestigationSessionState(BaseModel):
         return [t for t in self.tasks if t.category == category]
 
 
-# ── Workflow Variables ────────────────────────────────────────────────────────
-
-
-class WorkflowVariableType(StrEnum):
-    STRING = "string"
-    LIST = "list"
-    BOOL = "bool"
-    INTEGER = "integer"
-
-
-class WorkflowVariable(BaseModel):
-    """A typed workflow variable resolved from context or input."""
-
-    name: str
-    type: WorkflowVariableType = WorkflowVariableType.STRING
-    default: Any = ""
-    description: str = ""
-    required: bool = False
-
-
-class WorkflowVariables(BaseModel):
-    """Runtime values for workflow variables."""
-
-    framework: str = ""
-    technologies: list[str] = Field(default_factory=list)
-    cloud_provider: str = ""
-    auth_method: str = ""
-    graphql_enabled: bool = False
-    api_present: bool = False
-    websocket_enabled: bool = False
-    sso_enabled: bool = False
-    admin_panel_detected: bool = False
-    planner_confidence: float = 0.0
-    attack_surface_metadata: dict[str, Any] = Field(default_factory=dict)
-    extra: dict[str, Any] = Field(default_factory=dict)
-
-
 # ── Workflow Phases ──────────────────────────────────────────────────────────
 
 
@@ -285,6 +313,14 @@ class PhaseEvidenceRequirement(BaseModel):
     description: str
     evidence_type: str = "observation"
     required: bool = True
+
+
+class WorkflowStepType(StrEnum):
+    BUILTIN = "builtin"
+    AI = "ai"
+    APPROVAL = "approval"
+    CONDITIONAL = "conditional"
+    SUB_WORKFLOW = "sub_workflow"
 
 
 class PhaseStep(BaseModel):
@@ -356,37 +392,6 @@ class WorkflowTemplate(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
 
 
-# ── Workflow Metrics ─────────────────────────────────────────────────────────
-
-
-class WorkflowMetrics(BaseModel):
-    """Real-time tracking metrics for a running workflow."""
-
-    total_phases: int = 0
-    completed_phases: int = 0
-    total_steps: int = 0
-    completed_steps: int = 0
-    estimated_remaining_minutes: float = 0.0
-    evidence_count: int = 0
-    evidence_coverage: float = 0.0
-    checklist_coverage: float = 0.0
-    planner_confidence: float = 0.0
-    outstanding_tasks: int = 0
-    phase_metrics: dict[str, "PhaseMetrics"] = Field(default_factory=dict)
-
-
-class PhaseMetrics(BaseModel):
-    """Metrics for a single phase."""
-
-    phase_id: str
-    total_steps: int = 0
-    completed_steps: int = 0
-    estimated_minutes: int = 0
-    evidence_collected: int = 0
-    evidence_required: int = 0
-    completion_pct: float = 0.0
-
-
 # ── Conditional Phase ────────────────────────────────────────────────────────
 
 
@@ -401,18 +406,6 @@ class ConditionalPhase(BaseModel):
 
 
 # ── Expanded Workflow Definition ──────────────────────────────────────────────
-
-
-class WorkflowStepType(StrEnum):
-    BUILTIN = "builtin"
-    AI = "ai"
-    APPROVAL = "approval"
-    CONDITIONAL = "conditional"
-    SUB_WORKFLOW = "sub_workflow"
-
-
-class WorkflowStepDefinition(BaseModel):
-    """A single step in a YAML workflow definition."""
 
 
 class WorkflowStepDefinition(BaseModel):
