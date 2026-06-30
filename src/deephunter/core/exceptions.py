@@ -55,3 +55,7 @@ class TrainingError(DeepHunterError):
 
 class AgentError(DeepHunterError):
     """Raised when agent operations fail."""
+
+
+class ReconError(DeepHunterError):
+    """Raised when reconnaissance operations fail."""

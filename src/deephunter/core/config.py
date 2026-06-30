@@ -218,6 +218,32 @@ class PromptConfig(BaseSettings):
     template_directory: str = Field(default="")
 
 
+class ReconConfig(BaseSettings):
+    """Configuration for the Recon Intelligence Platform."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    enabled: bool = Field(default=True, description="Enable recon intelligence")
+    store_backend: str = Field(
+        default="sqlite",
+        description="Storage backend: 'sqlite' or 'json'",
+    )
+    sqlite_path: str | None = Field(
+        default=None,
+        description="SQLite database path (None = default ~/.deephunter/recon.db)",
+    )
+    json_path: str = Field(
+        default="./recon",
+        description="Base directory for JSON store",
+    )
+    max_assets: int = Field(default=0, ge=0, description="Max assets (0 = unlimited)")
+    pipeline_enabled: bool = Field(default=True)
+    enable_event_bus: bool = Field(default=True)
+    enable_timeline: bool = Field(default=True)
+    enable_metrics: bool = Field(default=True)
+    graph_max_nodes: int = Field(default=1_000_000, ge=1000, le=10_000_000)
+
+
 class AgentConfig(BaseSettings):
     """Configuration for the Agent Orchestration Framework."""
 
@@ -295,6 +321,7 @@ class DeepHunterConfig(BaseSettings):
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
+    recon: ReconConfig = Field(default_factory=ReconConfig)
 
     @field_validator("log_level")
     @classmethod
