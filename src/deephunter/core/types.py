@@ -74,6 +74,10 @@ class BugClass(str, Enum):
     BROKEN_AUTH = "broken_auth"
     RATE_LIMIT_BYPASS = "rate_limit_bypass"
     BUSINESS_LOGIC = "business_logic"
+    INFO_DISCLOSURE = "info_disclosure"
+    CRYPTO_FAILURE = "crypto_failure"
+    PRIVILEGE_ESCALATION = "privilege_escalation"
+    DOS = "dos"
     OTHER = "other"
 
 
