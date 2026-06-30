@@ -29,15 +29,34 @@ from deephunter.tools.normalizer import parse_ndjson, parse_txt
 class AmassAdapter(BaseToolPlugin):
     metadata = ToolMetadata(
         name="amass_adapter",
-        description="Import amass enumeration output (JSON, TXT) into recon models",
+        description="DNS enumeration and ASN lookup via Amass — discovers subdomains, IP ranges, and certificate data",
         version="1.0.0",
         category=ToolCategory.dns_enum,
-        tags=["dns", "enumeration", "amass", "asn", "certificate", "import"],
+        tags=["dns", "enumeration", "amass", "asn", "certificate"],
         supported_formats=["ndjson", "json", "txt"],
+        requires_network=True,
+        requires_installation=True,
+        timeout_default=600.0,
+        retry_default=0,
     )
 
     def execute(self, context: ExecutionContext) -> str | bytes | None:
-        raise NotImplementedError("AmassAdapter is import-only; use parse_output() with pre-collected output")
+        import shlex
+        import subprocess
+
+        domain = context.args.get("domain", context.target)
+        cmd = f"amass enum -d {domain} -json -"
+        try:
+            proc = subprocess.run(
+                shlex.split(cmd),
+                capture_output=True,
+                text=True,
+                timeout=context.get_plugin_timeout(),
+                env=context.env,
+            )
+            return proc.stdout
+        except subprocess.TimeoutExpired:
+            return None
 
     def parse_output(self, raw: str | bytes | None, context: ExecutionContext) -> list[dict[str, Any]]:
         if not raw:
@@ -149,5 +168,15 @@ class AmassAdapter(BaseToolPlugin):
 
     def build_command(self, context: ExecutionContext) -> str:
         domain = context.args.get("domain", context.target)
-        fmt = context.args.get("format", "json")
-        return f"amass enum -d {domain} -json output.json" if fmt == "json" else f"amass enum -d {domain}"
+        return f"amass enum -d {domain} -json -"
+
+    def health(self, context: ExecutionContext) -> "PluginHealth":
+        import shutil
+        found = shutil.which("amass") is not None
+        from deephunter.tools.models import PluginHealth
+        return PluginHealth(
+            healthy=found,
+            installed=found,
+            executable_found=found,
+            errors=[] if found else ["amass not found on PATH"],
+        )

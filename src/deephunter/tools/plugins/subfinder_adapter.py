@@ -26,15 +26,34 @@ from deephunter.tools.normalizer import parse_json, parse_txt
 class SubfinderAdapter(BaseToolPlugin):
     metadata = ToolMetadata(
         name="subfinder_adapter",
-        description="Import subfinder enumeration output (JSON or TXT) into recon models",
+        description="Fast subdomain enumeration via subfinder — passive DNS sources",
         version="1.0.0",
         category=ToolCategory.subdomain_enum,
-        tags=["subdomain", "dns", "import", "adapter"],
+        tags=["subdomain", "dns", "recon"],
         supported_formats=["json", "txt"],
+        requires_network=True,
+        requires_installation=True,
+        timeout_default=120.0,
+        retry_default=1,
     )
 
     def execute(self, context: ExecutionContext) -> str | bytes | None:
-        raise NotImplementedError("SubfinderAdapter is import-only; use parse_output() with pre-collected output")
+        import shlex
+        import subprocess
+
+        domain = context.args.get("domain", context.target)
+        cmd = f"subfinder -d {domain} -oJ -silent"
+        try:
+            proc = subprocess.run(
+                shlex.split(cmd),
+                capture_output=True,
+                text=True,
+                timeout=context.get_plugin_timeout(),
+                env=context.env,
+            )
+            return proc.stdout
+        except subprocess.TimeoutExpired:
+            return None
 
     def parse_output(self, raw: str | bytes | None, context: ExecutionContext) -> list[dict[str, Any]]:
         if not raw:
@@ -104,5 +123,15 @@ class SubfinderAdapter(BaseToolPlugin):
 
     def build_command(self, context: ExecutionContext) -> str:
         domain = context.args.get("domain", context.target)
-        fmt = context.args.get("format", "json")
-        return f"subfinder -d {domain} -oJ" if fmt == "json" else f"subfinder -d {domain}"
+        return f"subfinder -d {domain} -oJ -silent"
+
+    def health(self, context: ExecutionContext) -> "PluginHealth":
+        import shutil
+        found = shutil.which("subfinder") is not None
+        from deephunter.tools.models import PluginHealth
+        return PluginHealth(
+            healthy=found,
+            installed=found,
+            executable_found=found,
+            errors=[] if found else ["subfinder not found on PATH"],
+        )

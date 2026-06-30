@@ -1,4 +1,4 @@
-"""Assetfinder output adapter — imports subdomain enumeration results.
+"""Assetfinder output adapter — executes and imports subdomain enumeration results.
 
 Input formats supported:
   - TXT: one subdomain per line
@@ -25,15 +25,33 @@ from deephunter.tools.normalizer import parse_txt
 class AssetfinderAdapter(BaseToolPlugin):
     metadata = ToolMetadata(
         name="assetfinder_adapter",
-        description="Import assetfinder enumeration output (TXT) into recon models",
+        description="Subdomain enumeration via assetfinder — finds subdomains of a domain",
         version="1.0.0",
         category=ToolCategory.subdomain_enum,
-        tags=["subdomain", "asset", "import", "adapter"],
+        tags=["subdomain", "asset", "recon"],
         supported_formats=["txt"],
+        requires_network=True,
+        requires_installation=True,
+        timeout_default=120.0,
+        retry_default=1,
     )
 
     def execute(self, context: ExecutionContext) -> str | bytes | None:
-        raise NotImplementedError("AssetfinderAdapter is import-only; use parse_output() with pre-collected output")
+        import shlex
+        import subprocess
+
+        cmd = self.build_command(context)
+        try:
+            proc = subprocess.run(
+                shlex.split(cmd),
+                capture_output=True,
+                text=True,
+                timeout=context.get_plugin_timeout(),
+                env=context.env,
+            )
+            return proc.stdout
+        except subprocess.TimeoutExpired:
+            return None
 
     def parse_output(self, raw: str | bytes | None, context: ExecutionContext) -> list[str]:
         if not raw:
@@ -80,3 +98,14 @@ class AssetfinderAdapter(BaseToolPlugin):
     def build_command(self, context: ExecutionContext) -> str:
         domain = context.args.get("domain", context.target)
         return f"assetfinder --subs-only {domain}"
+
+    def health(self, context: ExecutionContext) -> "PluginHealth":
+        import shutil
+        found = shutil.which("assetfinder") is not None
+        from deephunter.tools.models import PluginHealth
+        return PluginHealth(
+            healthy=found,
+            installed=found,
+            executable_found=found,
+            errors=[] if found else ["assetfinder not found on PATH"],
+        )
