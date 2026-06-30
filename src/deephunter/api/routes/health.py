@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
+from deephunter import __version__
+
 router = APIRouter()
 
 
@@ -31,7 +33,7 @@ async def liveness_check() -> dict:
 async def version_info() -> dict:
     """Return version information."""
     return {
-        "version": "1.0.0",
+        "version": __version__,
         "api_version": "v1",
         "build_date": "2026-01-01",
     }

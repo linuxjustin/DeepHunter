@@ -11,10 +11,15 @@ from deephunter.router.provider import LegacyProviderAdapter, ModelProvider
 class DummyLegacyProvider:
     """Simulates an existing LLMProvider for adapter testing."""
 
-    def generate(self, prompt, system_prompt=None, temperature=None, max_tokens=None):
-        from deephunter.llm.base import LLMResponse
+    def generate(self, messages, temperature=None, max_tokens=None, **kwargs):
+        from deephunter.llm.base import LLMMessage, LLMResponse
+        if messages:
+            user_msg = next((m for m in messages if isinstance(m, LLMMessage) and m.role == "user"), None)
+            content = user_msg.content if user_msg else str(messages[0])
+        else:
+            content = str(messages)
         return LLMResponse(
-            content=f"Response to: {prompt[:20]}",
+            content=f"Response to: {content[:20]}",
             model="test-model",
             usage={"prompt_tokens": 10, "completion_tokens": 5},
         )

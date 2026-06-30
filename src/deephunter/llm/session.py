@@ -242,6 +242,8 @@ class AISessionManager:
         return result
 
     def cleanup_expired(self, max_age_hours: int = 24) -> int:
+        if max_age_hours <= 0:
+            return 0
         cutoff = datetime.now(UTC).timestamp() - (max_age_hours * 3600)
         to_delete = [
             sid for sid, s in self._sessions.items()

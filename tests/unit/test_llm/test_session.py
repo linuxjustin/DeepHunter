@@ -92,6 +92,7 @@ class TestAISession:
         session.add_user_message("Hello")
         session.add_assistant_message("Hi")
         session.add_user_message("How are you?")
+        session.add_assistant_message("I'm good, thanks!")
         turns = session.get_conversation_turns(max_turns=2)
         assert len(turns) == 4
 
