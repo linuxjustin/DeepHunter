@@ -1,0 +1,54 @@
+name: javascript
+description: Client-side JavaScript review — API keys, S3 buckets, hidden endpoints, DOM XSS
+version: "2.0"
+tags:
+  - core
+  - javascript
+  - client_side
+
+phases:
+  - id: js_collection
+    name: JS File Collection
+    description: Discover and collect all JavaScript files
+    steps:
+      - id: collect_js
+        name: Collect JavaScript Files
+        description: Gather all JS files from the target application
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze the JavaScript files loaded by {{ target }}. Identify: all inline scripts, external JS files, source maps, and JavaScript entry points. Prioritize files with .min.js or bundle patterns"
+        estimated_time_minutes: 10
+        priority: high
+        completion_criteria:
+          - All JS files cataloged
+
+  - id: secret_discovery
+    name: Secret Discovery
+    description: Search for hardcoded secrets, API keys, and tokens
+    steps:
+      - id: find_secrets
+        name: Find Hardcoded Secrets
+        description: Search for API keys, tokens, and credentials in JS files
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze JavaScript files from {{ target }} for hardcoded secrets: API keys, AWS keys, Firebase URLs, internal IPs, auth tokens, S3 bucket URLs, GraphQL endpoints, and admin URLs"
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - Secrets analysis complete
+          - Exposure documented
+
+  - id: dom_xss
+    name: DOM XSS Analysis
+    description: Analyze DOM manipulation patterns for XSS
+    steps:
+      - id: analyze_dom_xss
+        name: Analyze DOM XSS
+        description: Identify DOM-based XSS sinks and sources
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze JavaScript from {{ target }} for DOM XSS vulnerabilities. Check: innerHTML assignments, document.write calls, eval/ setTimeout usage, URL parameter parsing, hash/fragment handling, and postMessage handlers"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - DOM XSS patterns identified

@@ -87,30 +87,30 @@ class PromptBuilderContextBuilder:
         for hyp in state.hypotheses:
             hyp_observations = [
                 o for o in state.observations
-                if o.id in hyp.get("observation_ids", [])
+                if o.id in hyp.observation_ids
             ]
             hyp_evidence = [
                 e for e in state.evidence
-                if e.id in hyp.get("evidence_ids", [])
+                if e.id in hyp.evidence_ids
             ]
             hyp_experiments = [
                 e for e in state.experiments
-                if e.id in hyp.get("experiment_ids", [])
+                if e.id in hyp.experiment_ids
             ]
             hyp_findings = [
                 f for f in state.findings
-                if f.hypothesis_id == hyp["id"]
+                if f.hypothesis_id == hyp.id
             ]
 
             hyp_contexts.append(
                 HypothesisContext(
-                    hypothesis_id=hyp.get("id", ""),
-                    title=hyp.get("title", ""),
-                    description=hyp.get("description", ""),
-                    bug_classes=hyp.get("bug_classes", []),
-                    technologies=hyp.get("technologies", []),
-                    confidence=hyp.get("confidence", 0.0),
-                    status=hyp.get("status", ""),
+                    hypothesis_id=hyp.id,
+                    title=hyp.title,
+                    description=hyp.description,
+                    bug_classes=[bc.value for bc in hyp.bug_classes],
+                    technologies=hyp.technologies,
+                    confidence=hyp.confidence,
+                    status=hyp.status.value,
                     observations=hyp_observations,
                     evidence=hyp_evidence,
                     experiments=hyp_experiments,

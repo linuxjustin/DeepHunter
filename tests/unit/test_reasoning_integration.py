@@ -13,6 +13,7 @@ from deephunter.reasoning.events import (
     ObservationCreatedEvent,
     PivotCreatedEvent,
 )
+from deephunter.reasoning.models import HypothesisStatus
 from deephunter.reasoning.pipeline import ReasoningPipeline
 from deephunter.reasoning.session import InvestigationSession
 
@@ -69,13 +70,13 @@ class TestFullLifecycle:
         session.state.technology_fingerprint.frameworks = ["flask"]
 
         exp1 = session.create_experiment(
-            hypothesis_id=hyp1["id"],
+            hypothesis_id=hyp1.id,
             description="Test JWT 'none' algorithm",
             procedure="Send JWT with alg:none",
             expected_result="Server accepts unsigned token",
         )
         exp2 = session.create_experiment(
-            hypothesis_id=hyp2["id"],
+            hypothesis_id=hyp2.id,
             description="Test user enumeration",
             procedure="Send requests to /api/reset with valid and invalid emails",
             expected_result="Error messages differ",
@@ -101,12 +102,12 @@ class TestFullLifecycle:
         assert updated_exp1.status.value == "completed"
         assert updated_exp2.status.value == "completed"
 
-        session.update_hypothesis_confidence(hyp1["id"])
-        session.update_hypothesis_confidence(hyp2["id"])
-        hyp1_updated = [h for h in session.state.hypotheses if h["id"] == hyp1["id"]][0]
-        hyp2_updated = [h for h in session.state.hypotheses if h["id"] == hyp2["id"]][0]
-        assert hyp1_updated.get("confidence", 0) >= 0
-        assert hyp2_updated.get("confidence", 0) >= 0
+        session.update_hypothesis_confidence(hyp1.id)
+        session.update_hypothesis_confidence(hyp2.id)
+        hyp1_updated = [h for h in session.state.hypotheses if h.id == hyp1.id][0]
+        hyp2_updated = [h for h in session.state.hypotheses if h.id == hyp2.id][0]
+        assert hyp1_updated.confidence >= 0
+        assert hyp2_updated.confidence >= 0
 
         pvt = session.create_pivot(
             description="Check for other JWT attacks (key confusion, KID injection)",
@@ -116,11 +117,11 @@ class TestFullLifecycle:
         )
         assert pvt.id.startswith("pvt-")
 
-        hyp1_updated["status"] = "confirmed"
+        hyp1_updated.status = HypothesisStatus.CONFIRMED
 
         fnd = session.create_finding(
             title="JWT None Algorithm Rejected",
-            hypothesis_id=hyp1["id"],
+            hypothesis_id=hyp1.id,
             description="Server rejects 'none' algorithm but may be vulnerable to other JWT attacks",
             bug_classes=["auth_bypass"],
             severity="medium",
@@ -158,7 +159,7 @@ class TestFullLifecycle:
         session.create_observation("other", description="Initial observation", source="recon")
         hyp = session.create_hypothesis(title="Test hypothesis", description="Test")
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Experiment",
             procedure="Test procedure",
             expected_result="Vulnerability",

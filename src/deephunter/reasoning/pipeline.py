@@ -15,11 +15,31 @@ from __future__ import annotations
 
 import time
 
-from deephunter.reasoning.models import ExperimentStatus
+from deephunter.reasoning.models import HypothesisPriority
 from deephunter.reasoning.session import InvestigationSession
 from deephunter.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+_PRIORITY_RANK = {
+    HypothesisPriority.CRITICAL: 5,
+    HypothesisPriority.HIGH: 4,
+    HypothesisPriority.MEDIUM: 3,
+    HypothesisPriority.LOW: 2,
+    HypothesisPriority.INFO: 1,
+}
+
+_BC_TO_PRIORITY: dict[str, HypothesisPriority] = {
+    "rce": HypothesisPriority.CRITICAL,
+    "sql_injection": HypothesisPriority.CRITICAL,
+    "deserialization": HypothesisPriority.CRITICAL,
+    "auth_bypass": HypothesisPriority.HIGH,
+    "ssrf": HypothesisPriority.HIGH,
+    "lfi": HypothesisPriority.MEDIUM,
+    "xss": HypothesisPriority.MEDIUM,
+    "idor": HypothesisPriority.LOW,
+}
 
 
 def _status_in(status: object, *values: str) -> bool:
@@ -159,7 +179,7 @@ class HypothesisGenerationStage(ReasoningStage):
         if not tech_names:
             tech_names = ["web"]
 
-        hyp = session.create_hypothesis(
+        session.create_hypothesis(
             title=f"Investigate {', '.join(tech_names)} application",
             description=f"Systematic security review of {', '.join(tech_names)} application.",
             technologies=tech_names,
@@ -176,32 +196,21 @@ class PrioritizationStage(ReasoningStage):
     name = "prioritization"
 
     def process(self, session: InvestigationSession) -> None:
-        from deephunter.core.types import BugClass
-
-        priority_map = {
-            BugClass.RCE: 10,
-            BugClass.SQL_INJECTION: 9,
-            BugClass.DESERIALIZATION: 8,
-            BugClass.AUTH_BYPASS: 7,
-            BugClass.SSRF: 7,
-            BugClass.LFI: 6,
-            BugClass.XSS: 5,
-            BugClass.IDOR: 4,
-        }
-
         for hyp in session.state.hypotheses:
-            hyp_id = hyp["id"]
             try:
-                session.update_hypothesis_confidence(hyp_id)
+                session.update_hypothesis_confidence(hyp.id)
             except ValueError:
                 continue
             bc_priority = max(
-                (priority_map.get(BugClass(bc), 0) for bc in hyp.get("bug_classes", [])),
-                default=0,
+                (_BC_TO_PRIORITY.get(bc.value, HypothesisPriority.MEDIUM) for bc in hyp.bug_classes),
+                default=HypothesisPriority.MEDIUM,
             )
-            hyp["priority"] = bc_priority
+            hyp.priority = bc_priority
 
-        session.state.hypotheses.sort(key=lambda h: (h.get("priority", 0), h.get("confidence", 0)), reverse=True)
+        session.state.hypotheses.sort(
+            key=lambda h: (_PRIORITY_RANK.get(h.priority, 0), h.confidence),
+            reverse=True,
+        )
 
 
 class ExperimentPlanningStage(ReasoningStage):
@@ -217,15 +226,15 @@ class ExperimentPlanningStage(ReasoningStage):
         for hyp in session.state.hypotheses:
             existing = [
                 e for e in session.state.experiments
-                if e.hypothesis_id == hyp["id"]
+                if e.hypothesis_id == hyp.id
             ]
             if existing:
                 continue
 
-            if hyp.get("confidence", 0) >= 0.2:
+            if hyp.confidence >= 0.2:
                 session.create_experiment(
-                    hypothesis_id=hyp["id"],
-                    description=f"Manual test for: {hyp['title']}",
+                    hypothesis_id=hyp.id,
+                    description=f"Manual test for: {hyp.title}",
                     procedure="Investigate the hypothesis manually",
                     expected_result="Vulnerability confirmed or refuted",
                 )
@@ -255,14 +264,13 @@ class ConfidenceUpdateStage(ReasoningStage):
 
     def process(self, session: InvestigationSession) -> None:
         for hyp in session.state.hypotheses:
-            hyp_id = hyp["id"]
             related_exps = [
                 e for e in session.state.experiments
-                if e.hypothesis_id == hyp_id
+                if e.hypothesis_id == hyp.id
             ]
             if any(_status_in(e.status, "completed", "failed") for e in related_exps):
                 try:
-                    session.update_hypothesis_confidence(hyp_id, related_exps)
+                    session.update_hypothesis_confidence(hyp.id, related_exps)
                 except ValueError:
                     continue
 
@@ -305,14 +313,14 @@ class FindingCreationStage(ReasoningStage):
 
     def process(self, session: InvestigationSession) -> None:
         for hyp in session.state.hypotheses:
-            if hyp.get("finding_id") is not None:
+            if hyp.finding_id is not None:
                 continue
-            if hyp.get("status") != "confirmed":
+            if hyp.status.value != "confirmed":
                 continue
 
             related_exps = [
                 e.id for e in session.state.experiments
-                if e.hypothesis_id == hyp["id"]
+                if e.hypothesis_id == hyp.id
                 and _status_in(e.status, "completed")
                 and e.actual_result.strip()
             ]
@@ -320,10 +328,10 @@ class FindingCreationStage(ReasoningStage):
                 continue
 
             session.create_finding(
-                title=hyp["title"],
-                hypothesis_id=hyp["id"],
-                description=hyp.get("description", ""),
-                bug_classes=hyp.get("bug_classes", []),
+                title=hyp.title,
+                hypothesis_id=hyp.id,
+                description=hyp.description,
+                bug_classes=[bc.value for bc in hyp.bug_classes],
                 severity="medium",
                 experiment_ids=related_exps,
             )

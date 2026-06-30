@@ -1,9 +1,7 @@
 """Reasoning engine — investigation pipeline and hypothesis management."""
 
 from deephunter.reasoning.hypothesis import (
-    Hypothesis,
     HypothesisGenerator,
-    HypothesisPriority,
 )
 from deephunter.reasoning.models import (
     Evidence,
@@ -11,6 +9,8 @@ from deephunter.reasoning.models import (
     Experiment,
     ExperimentStatus,
     Finding,
+    Hypothesis,
+    HypothesisPriority,
     Investigation,
     InvestigationState,
     Observation,

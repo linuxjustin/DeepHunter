@@ -1,0 +1,71 @@
+name: finding_prep
+description: Finding preparation — triage, evidence organization, severity assessment, write-up drafting
+version: "2.0"
+tags:
+  - core
+  - reporting
+  - triage
+
+phases:
+  - id: evidence_review
+    name: Evidence Review
+    description: Review and organize all collected evidence
+    checkpoints:
+      - evidence_organized
+    steps:
+      - id: review_evidence
+        name: Review Collected Evidence
+        description: Organize and validate all evidence collected during the investigation
+        type: builtin
+        action: collect_evidence
+        estimated_time_minutes: 10
+        priority: high
+        completion_criteria:
+          - All evidence reviewed and categorized
+
+  - id: finding_triage
+    name: Finding Triage
+    description: Triage potential findings by severity and impact
+    steps:
+      - id: triage_findings
+        name: Triage Potential Findings
+        description: Prioritize findings by severity, impact, and exploitability
+        type: ai
+        task_type: reasoning
+        prompt_template: "Triage the findings from the {{ target }} investigation. For each finding provide: severity rating (critical/high/medium/low/info), CWE ID, CVSS score, exploitability assessment, business impact, and recommended remediation priority"
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - All findings triaged
+          - Severity ratings assigned
+
+  - id: writeup_drafting
+    name: Write-up Drafting
+    description: Draft professional finding write-ups
+    steps:
+      - id: draft_writeups
+        name: Draft Finding Write-ups
+        description: Create detailed write-ups for each confirmed finding
+        type: ai
+        task_type: report_drafting
+        prompt_template: "Draft professional bug bounty finding write-ups for {{ target }}. Each write-up should include: title, severity, CWE ID, CVSS vector, vulnerable endpoint, request/response evidence, steps to reproduce, impact assessment, remediation recommendation, and references"
+        estimated_time_minutes: 30
+        priority: critical
+        completion_criteria:
+          - All write-ups drafted
+          - Evidence attached to findings
+
+  - id: peer_review
+    name: Peer Review
+    description: Final review of findings before submission
+    steps:
+      - id: review_findings
+        name: Review Draft Findings
+        description: Quality check all findings for completeness and accuracy
+        type: builtin
+        action: review_findings
+        estimated_time_minutes: 10
+        priority: medium
+        completion_criteria:
+          - Findings quality checked
+          - Ready for report generation

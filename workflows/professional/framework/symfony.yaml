@@ -1,0 +1,59 @@
+name: symfony
+description: Symfony security review — profiler, Doctrine, Twig, authentication, routing
+version: "2.0"
+tags:
+  - framework
+  - symfony
+  - php
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: symfony
+
+conditional_phases:
+  - framework_match:
+      - symfony
+
+phases:
+  - id: symfony_fingerprint
+    name: Symfony Fingerprinting
+    description: Identify Symfony version, bundles, and profiler status
+    steps:
+      - id: fingerprint_symfony
+        name: Fingerprint Symfony
+        description: Identify version, installed bundles, and debug mode
+        type: ai
+        task_type: reasoning
+        prompt_template: "Fingerprint Symfony at {{ target }}. Check: /_profiler/phpinfo, /_profiler/ open in prod, /_profiler/search, /.env exposure, /var/log/ exposure, and Symfony version from headers or cookies"
+        estimated_time_minutes: 10
+        priority: critical
+
+  - id: doctrine_analysis
+    name: Doctrine ORM Analysis
+    description: Analyze Doctrine for SQL injection and data exposure
+    steps:
+      - id: analyze_doctrine
+        name: Analyze Doctrine
+        description: Check for DQL injection and repository exposure
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Doctrine ORM at {{ target }}. Check: DQL string concatenation, findBy* magic methods with user input, custom repository query injection, and association mapping data leakage"
+        estimated_time_minutes: 15
+        priority: critical
+
+  - id: twig_analysis
+    name: Twig Security Analysis
+    description: Analyze Twig template configuration
+    steps:
+      - id: analyze_twig
+        name: Analyze Twig
+        description: Check for Twig sandbox escapes and SSTI
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Twig configuration at {{ target }}. Check: Twig sandbox bypass, autoescape settings, custom Twig extension security, user input in template includes, and {{ }} vs {% %} injection"
+        estimated_time_minutes: 15
+        priority: high

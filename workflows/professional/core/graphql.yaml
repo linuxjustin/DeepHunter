@@ -1,0 +1,89 @@
+name: graphql
+description: GraphQL API security review — introspection, batching attacks, authorization, deep recursion
+version: "2.0"
+tags:
+  - core
+  - graphql
+  - api
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: graphql_enabled
+    type: bool
+    default: true
+
+conditional_phases:
+  - condition: graphql_enabled
+    technology_match:
+      - graphql
+
+phases:
+  - id: introspection
+    name: Introspection Analysis
+    description: Analyze GraphQL schema via introspection
+    methodology_packs:
+      - graphql
+    knowledge_packs:
+      - graphql
+    checkpoints:
+      - introspection_complete
+    steps:
+      - id: run_introspection
+        name: Run Introspection Query
+        description: Query the GraphQL schema via __schema introspection
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze the GraphQL endpoint at {{ target }} for introspection. Check: introspection enabled, schema accessible at /graphql or /graphiql, and __typename exposure. Document all types, queries, mutations, and subscriptions"
+        estimated_time_minutes: 10
+        priority: critical
+        completion_criteria:
+          - Schema fully documented
+          - All queries and mutations identified
+
+  - id: authorization_testing
+    name: Authorization Testing
+    description: Test field-level and operation-level authorization
+    steps:
+      - id: test_authz
+        name: Test GraphQL Authorization
+        description: Test authorization for each query and mutation
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test GraphQL authorization at {{ target }}. Check: field-level authorization, operation-level authorization, access to admin-only queries, data leakage through nested queries, and unauthorized mutation execution"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - Authorization tested per operation
+          - Vulnerabilities documented
+
+  - id: batching_attacks
+    name: Batching Attack Testing
+    description: Test for GraphQL batching/batching rate limit bypass
+    steps:
+      - id: test_batching
+        name: Test Batching Attacks
+        description: Test aliased queries and batched mutations
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test batching attacks at {{ target }} GraphQL endpoint. Check: aliased queries for brute force, batched mutations, concurrent query attacks, and query cost analysis for DoS potential"
+        estimated_time_minutes: 15
+        priority: high
+        completion_criteria:
+          - Batching attack surface documented
+
+  - id: recursion_depth
+    name: Deep Recursion Testing
+    description: Test for deep query recursion vulnerabilities
+    steps:
+      - id: test_recursion
+        name: Test Deep Recursion
+        description: Test circular queries for DoS potential
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test for deep recursion vulnerabilities at {{ target }}. Check: circular query depth limits, query complexity analysis, pagination argument abuse, and array-based field explosions"
+        estimated_time_minutes: 10
+        priority: high
+        completion_criteria:
+          - Recursion depth limits evaluated

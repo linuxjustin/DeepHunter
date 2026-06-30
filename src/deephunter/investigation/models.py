@@ -206,6 +206,9 @@ class InvestigationSessionState(BaseModel):
     selected_methodology_packs: list[str] = Field(default_factory=list)
     current_step: str = ""
     completed_steps: list[str] = Field(default_factory=list)
+    completed_phases: list[str] = Field(default_factory=list)
+    variables: WorkflowVariables = Field(default_factory=WorkflowVariables)
+    metrics: WorkflowMetrics = Field(default_factory=WorkflowMetrics)
     checkpoint_data: dict[str, Any] = Field(default_factory=dict)
     reasoning_session_id: str = ""
     planner_result_id: str = ""
@@ -228,7 +231,176 @@ class InvestigationSessionState(BaseModel):
         return [t for t in self.tasks if t.category == category]
 
 
-# ── Workflow DSL Types ───────────────────────────────────────────────────────
+# ── Workflow Variables ────────────────────────────────────────────────────────
+
+
+class WorkflowVariableType(StrEnum):
+    STRING = "string"
+    LIST = "list"
+    BOOL = "bool"
+    INTEGER = "integer"
+
+
+class WorkflowVariable(BaseModel):
+    """A typed workflow variable resolved from context or input."""
+
+    name: str
+    type: WorkflowVariableType = WorkflowVariableType.STRING
+    default: Any = ""
+    description: str = ""
+    required: bool = False
+
+
+class WorkflowVariables(BaseModel):
+    """Runtime values for workflow variables."""
+
+    framework: str = ""
+    technologies: list[str] = Field(default_factory=list)
+    cloud_provider: str = ""
+    auth_method: str = ""
+    graphql_enabled: bool = False
+    api_present: bool = False
+    websocket_enabled: bool = False
+    sso_enabled: bool = False
+    admin_panel_detected: bool = False
+    planner_confidence: float = 0.0
+    attack_surface_metadata: dict[str, Any] = Field(default_factory=dict)
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+
+# ── Workflow Phases ──────────────────────────────────────────────────────────
+
+
+class PhaseResourceRef(BaseModel):
+    """Reference to a knowledge pack, methodology pack, or planner rule."""
+
+    name: str
+    type: str = "knowledge_pack"  # knowledge_pack, methodology_pack, planner_rule
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class PhaseEvidenceRequirement(BaseModel):
+    """Expected evidence to be collected during a phase."""
+
+    description: str
+    evidence_type: str = "observation"
+    required: bool = True
+
+
+class PhaseStep(BaseModel):
+    """A step definition within a workflow phase."""
+
+    id: str
+    name: str = ""
+    description: str = ""
+    objective: str = ""
+    step_type: WorkflowStepType = Field(default=WorkflowStepType.BUILTIN, alias="type")
+    action: str = ""
+    task_type: str = ""
+    prompt_template: str = ""
+    depends_on: list[str] = Field(default_factory=list)
+    condition: str = ""
+    branches: dict[str, list[str]] = Field(default_factory=dict)
+    approval_message: str = ""
+    timeout_seconds: int = 600
+    retry_count: int = 0
+    estimated_time_minutes: int = 15
+    priority: str = "medium"
+    difficulty: str = "medium"
+    required_inputs: list[str] = Field(default_factory=list)
+    expected_outputs: list[str] = Field(default_factory=list)
+    evidence_requirements: list[PhaseEvidenceRequirement] = Field(default_factory=list)
+    completion_criteria: list[str] = Field(default_factory=list)
+    config: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class WorkflowPhase(BaseModel):
+    """A named phase containing multiple steps."""
+
+    id: str
+    name: str = ""
+    description: str = ""
+    steps: list[PhaseStep] = Field(default_factory=list)
+    resources: list[PhaseResourceRef] = Field(default_factory=list)
+    methodology_packs: list[str] = Field(default_factory=list)
+    knowledge_packs: list[str] = Field(default_factory=list)
+    planner_rules: list[str] = Field(default_factory=list)
+    checkpoints: list[str] = Field(default_factory=list)
+    evidence_requirements: list[PhaseEvidenceRequirement] = Field(default_factory=list)
+
+
+class WorkflowCheckpoint(BaseModel):
+    """A named checkpoint that can be used for pause/resume."""
+
+    id: str
+    name: str = ""
+    description: str = ""
+    phase_id: str = ""
+    requires_approval: bool = False
+    approval_message: str = ""
+
+
+# ── Workflow Templates ───────────────────────────────────────────────────────
+
+
+class WorkflowTemplate(BaseModel):
+    """A reusable template that can be referenced by workflows."""
+
+    name: str
+    description: str = ""
+    phases: list[WorkflowPhase] = Field(default_factory=list)
+    variables: list[WorkflowVariable] = Field(default_factory=list)
+    inputs: dict[str, str] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+# ── Workflow Metrics ─────────────────────────────────────────────────────────
+
+
+class WorkflowMetrics(BaseModel):
+    """Real-time tracking metrics for a running workflow."""
+
+    total_phases: int = 0
+    completed_phases: int = 0
+    total_steps: int = 0
+    completed_steps: int = 0
+    estimated_remaining_minutes: float = 0.0
+    evidence_count: int = 0
+    evidence_coverage: float = 0.0
+    checklist_coverage: float = 0.0
+    planner_confidence: float = 0.0
+    outstanding_tasks: int = 0
+    phase_metrics: dict[str, "PhaseMetrics"] = Field(default_factory=dict)
+
+
+class PhaseMetrics(BaseModel):
+    """Metrics for a single phase."""
+
+    phase_id: str
+    total_steps: int = 0
+    completed_steps: int = 0
+    estimated_minutes: int = 0
+    evidence_collected: int = 0
+    evidence_required: int = 0
+    completion_pct: float = 0.0
+
+
+# ── Conditional Phase ────────────────────────────────────────────────────────
+
+
+class ConditionalPhase(BaseModel):
+    """A phase that is conditionally executed based on a condition."""
+
+    phase: WorkflowPhase
+    condition: str = ""
+    framework_match: list[str] = Field(default_factory=list)
+    technology_match: list[str] = Field(default_factory=list)
+    variable_match: dict[str, Any] = Field(default_factory=dict)
+
+
+# ── Expanded Workflow Definition ──────────────────────────────────────────────
 
 
 class WorkflowStepType(StrEnum):
@@ -237,6 +409,10 @@ class WorkflowStepType(StrEnum):
     APPROVAL = "approval"
     CONDITIONAL = "conditional"
     SUB_WORKFLOW = "sub_workflow"
+
+
+class WorkflowStepDefinition(BaseModel):
+    """A single step in a YAML workflow definition."""
 
 
 class WorkflowStepDefinition(BaseModel):
@@ -270,8 +446,19 @@ class WorkflowDefinition(BaseModel):
     description: str = ""
     version: str = "1.0"
     steps: list[WorkflowStepDefinition] = Field(default_factory=list)
+    phases: list[WorkflowPhase] = Field(default_factory=list)
+    conditional_phases: list[ConditionalPhase] = Field(default_factory=list)
+    templates: list[WorkflowTemplate] = Field(default_factory=list)
+    variables: list[WorkflowVariable] = Field(default_factory=list)
+    checkpoints: list[WorkflowCheckpoint] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     config: dict[str, Any] = Field(default_factory=dict)
+
+    def get_phase(self, phase_id: str) -> WorkflowPhase | None:
+        for p in self.phases:
+            if p.id == phase_id:
+                return p
+        return None
 
 
 class WorkflowStepResult(BaseModel):
@@ -292,6 +479,7 @@ class WorkflowResult(BaseModel):
     step_results: list[WorkflowStepResult] = Field(default_factory=list)
     total_execution_time_ms: float = 0.0
     error: str = ""
+    metrics: WorkflowMetrics | None = None
 
 
 # ── Investigation Report ─────────────────────────────────────────────────────

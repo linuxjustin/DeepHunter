@@ -1,0 +1,100 @@
+name: attack_surface
+description: Attack surface expansion — URL discovery, parameter analysis, technology fingerprinting
+version: "2.0"
+tags:
+  - core
+  - attack_surface
+  - discovery
+
+variables:
+  - name: target
+    type: string
+    required: true
+    description: Target domain
+
+phases:
+  - id: url_discovery
+    name: URL Discovery
+    description: Discover endpoints, parameters, and hidden paths
+    checkpoints:
+      - urls_discovered
+    steps:
+      - id: gau_discovery
+        name: GAU URL Discovery
+        description: Gather URLs from AlienVault OTX, WayBack Machine, and CommonCrawl
+        type: builtin
+        action: import_recon
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - All public URL sources queried
+          - Initial URL list > 100 entries
+      - id: wayback_discovery
+        name: Wayback Machine Discovery
+        description: Fetch historical URLs from Wayback Machine
+        type: builtin
+        action: import_recon
+        depends_on:
+          - gau_discovery
+        estimated_time_minutes: 10
+        priority: high
+
+  - id: parameter_analysis
+    name: Parameter Analysis
+    description: Analyze discovered parameters for injection points
+    steps:
+      - id: extract_parameters
+        name: Extract Parameters
+        description: Extract all URL parameters and build parameter map
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze the discovered URLs for {{ target }} and identify parameter patterns, common parameter names, and potential injection points"
+        estimated_time_minutes: 5
+        priority: high
+        completion_criteria:
+          - Parameter map compiled
+          - Injection point candidates identified
+
+  - id: technology_fingerprinting
+    name: Technology Fingerprinting
+    description: Identify web technologies, frameworks, and infrastructure
+    steps:
+      - id: identify_tech
+        name: Identify Technologies
+        description: Fingerprint technologies from HTTP responses
+        type: builtin
+        action: identify_technologies
+        estimated_time_minutes: 5
+        priority: high
+        expected_outputs:
+          - Technology stack
+          - Framework versions
+          - Infrastructure details
+        completion_criteria:
+          - All technologies identified
+          - Version numbers captured
+      - id: ai_tech_analysis
+        name: AI Technology Analysis
+        description: Analyze technology stack for known vulnerabilities
+        type: ai
+        task_type: reasoning
+        prompt_template: "Given the technology stack for {{ target }}, identify known CVEs, misconfigurations, and attack surface expansion opportunities"
+        depends_on:
+          - identify_tech
+        estimated_time_minutes: 5
+        priority: medium
+
+  - id: graph_building
+    name: Attack Surface Graph
+    description: Build the attack surface graph
+    steps:
+      - id: build_graph
+        name: Build Attack Surface Graph
+        description: Construct the attack surface graph from all collected data
+        type: builtin
+        action: build_attack_surface_graph
+        estimated_time_minutes: 3
+        priority: high
+        completion_criteria:
+          - Attack surface graph constructed
+          - All assets mapped

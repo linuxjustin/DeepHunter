@@ -1,0 +1,63 @@
+name: admin_panel
+description: Admin panel discovery and review — hidden panels, default credentials, privilege escalation
+version: "2.0"
+tags:
+  - core
+  - admin
+  - discovery
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: admin_panel_detected
+    type: bool
+    default: false
+
+phases:
+  - id: panel_discovery
+    name: Admin Panel Discovery
+    description: Discover hidden administrative panels and interfaces
+    steps:
+      - id: discover_admin_panels
+        name: Discover Admin Panels
+        description: Brute force and discover common admin panel paths
+        type: ai
+        task_type: reasoning
+        prompt_template: "Discover admin panels at {{ target }}. Check common paths: /admin, /administrator, /backend, /cms, /wp-admin, /manager, /console, /panel, /dashboard. Also check for: admin subdomains, staging environments, and internal tool endpoints"
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - Admin panels discovered
+          - Access methods documented
+
+  - id: default_credentials
+    name: Default Credential Testing
+    description: Test discovered panels for default credentials
+    steps:
+      - id: test_default_creds
+        name: Test Default Credentials
+        description: Attempt common default credentials on discovered panels
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test default credentials on admin panels at {{ target }}. Check: admin:admin, admin:password, admin:admin123, root:root, administrator:administrator, and framework-specific defaults. Also check for blank passwords and password hints in page source"
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - Default credentials tested
+          - Weak credentials documented
+
+  - id: post_auth_testing
+    name: Post-Authentication Testing
+    description: Test admin functionality after authentication
+    steps:
+      - id: test_admin_functionality
+        name: Test Admin Functionality
+        description: Analyze admin panel for post-auth vulnerabilities
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze admin functionality at {{ target }} for: IDOR in admin user management, file upload in admin panels, SQL injection in admin search/logs, SSTI in admin template editors, RCE via admin plugin/module installation, and SSRF in admin import features"
+        estimated_time_minutes: 25
+        priority: high
+        completion_criteria:
+          - Admin functionality analyzed

@@ -1,0 +1,75 @@
+name: technology_profiling
+description: Detailed technology profiling — framework detection, version analysis, component inventory
+version: "2.0"
+tags:
+  - core
+  - technology
+  - profiling
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    description: Detected framework name
+
+phases:
+  - id: framework_detection
+    name: Framework Detection
+    description: Detect and verify the web framework in use
+    steps:
+      - id: detect_framework
+        name: Detect Web Framework
+        description: Identify the web framework from HTTP headers, cookies, and page content
+        type: builtin
+        action: identify_technologies
+        estimated_time_minutes: 5
+        priority: critical
+        completion_criteria:
+          - Framework identified
+          - Version confirmed
+
+  - id: component_inventory
+    name: Component Inventory
+    description: Inventory all third-party components, libraries, and dependencies
+    steps:
+      - id: inventory_components
+        name: Inventory Components
+        description: Identify JavaScript libraries, CSS frameworks, and server components
+        type: ai
+        task_type: reasoning
+        prompt_template: "Based on the technology profile for {{ target }}, create a comprehensive component inventory including versions, known vulnerabilities, and deprecation status"
+        estimated_time_minutes: 10
+        priority: high
+        completion_criteria:
+          - Component inventory complete
+          - Version numbers captured
+          - Known vulnerabilities identified
+      - id: select_knowledge_packs
+        name: Select Knowledge Packs
+        description: Load relevant knowledge packs based on identified technologies
+        type: builtin
+        action: select_knowledge_packs
+        depends_on:
+          - inventory_components
+        estimated_time_minutes: 2
+        priority: high
+        completion_criteria:
+          - Knowledge packs selected for all technologies
+
+  - id: infrastructure_analysis
+    name: Infrastructure Analysis
+    description: Identify hosting, CDN, WAF, and infrastructure details
+    steps:
+      - id: analyze_infrastructure
+        name: Analyze Infrastructure
+        description: Identify CDN, WAF, cloud provider, and hosting details
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze the infrastructure for {{ target }}. Identify CDN provider, WAF, cloud provider, origin IP, and any security controls in place"
+        estimated_time_minutes: 5
+        priority: high
+        completion_criteria:
+          - Infrastructure details documented
+          - Security controls identified

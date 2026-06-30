@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from deephunter.core.types import Technology
+from deephunter.core.types import BugClass, Technology
+from deephunter.reasoning.models import HypothesisPriority, HypothesisStatus
 from deephunter.reasoning.pipeline import (
     ConfidenceUpdateStage,
     EvidenceCollectionStage,
@@ -95,14 +96,14 @@ class TestPrioritizationStage:
         h1 = session.create_hypothesis(title="Low priority", description="Test")
         h2 = session.create_hypothesis(title="Medium priority", description="Test")
         h3 = session.create_hypothesis(title="High priority", description="Test")
-        h1["bug_classes"] = ["xss"]
-        h2["bug_classes"] = ["ssrf"]
-        h3["bug_classes"] = ["rce"]
+        h1.bug_classes = [BugClass.XSS]
+        h2.bug_classes = [BugClass.SSRF]
+        h3.bug_classes = [BugClass.RCE]
 
         stage = PrioritizationStage()
         stage.process(session)
 
-        titles = [h["title"] for h in session.state.hypotheses]
+        titles = [h.title for h in session.state.hypotheses]
         assert titles[0] == "High priority"
 
     def test_runs_without_hypotheses(self) -> None:
@@ -115,7 +116,7 @@ class TestExperimentPlanningStage:
     def test_creates_experiments_for_high_confidence(self) -> None:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="SQLi", description="SQL injection")
-        hyp["confidence"] = 0.5
+        hyp.confidence = 0.5
         stage = ExperimentPlanningStage()
         stage.process(session)
         assert len(session.state.experiments) >= 1
@@ -123,7 +124,7 @@ class TestExperimentPlanningStage:
     def test_skips_low_confidence(self) -> None:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="SQLi", description="SQL injection")
-        hyp["confidence"] = 0.1
+        hyp.confidence = 0.1
         stage = ExperimentPlanningStage()
         stage.process(session)
         assert len(session.state.experiments) == 0
@@ -131,9 +132,9 @@ class TestExperimentPlanningStage:
     def test_does_not_duplicate(self) -> None:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="SQLi", description="SQL injection")
-        hyp["confidence"] = 0.5
+        hyp.confidence = 0.5
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Existing",
             procedure="Proc",
             expected_result="Res",
@@ -156,7 +157,7 @@ class TestConfidenceUpdateStage:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="Test", description="Test")
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Result",
@@ -167,8 +168,8 @@ class TestConfidenceUpdateStage:
         stage = ConfidenceUpdateStage()
         stage.process(session)
 
-        updated = [h for h in session.state.hypotheses if h["id"] == hyp["id"]][0]
-        assert updated.get("confidence", 0) >= 0
+        updated = [h for h in session.state.hypotheses if h.id == hyp.id][0]
+        assert updated.confidence >= 0
 
     def test_no_experiments(self) -> None:
         session = InvestigationSession.new("https://example.com")
@@ -182,7 +183,7 @@ class TestPivotGenerationStage:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="Test", description="Test")
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Result",
@@ -199,7 +200,7 @@ class TestPivotGenerationStage:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="Test", description="Test")
         session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Result",
@@ -212,7 +213,7 @@ class TestPivotGenerationStage:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="Test", description="Test")
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Result",
@@ -230,9 +231,9 @@ class TestFindingCreationStage:
     def test_creates_finding_for_confirmed_hypothesis(self) -> None:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="SQLi", description="SQL injection")
-        hyp["status"] = "confirmed"
+        hyp.status = HypothesisStatus.CONFIRMED
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Result",
@@ -245,14 +246,14 @@ class TestFindingCreationStage:
         stage.process(session)
 
         assert len(session.state.findings) == 1
-        assert session.state.findings[0].hypothesis_id == hyp["id"]
+        assert session.state.findings[0].hypothesis_id == hyp.id
 
     def test_skips_if_finding_exists(self) -> None:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="SQLi", description="SQL injection")
-        hyp["finding_id"] = "fnd-1"
+        hyp.finding_id = "fnd-1"
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Result",
@@ -268,9 +269,9 @@ class TestFindingCreationStage:
     def test_skips_non_confirmed(self) -> None:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="SQLi", description="SQL injection")
-        hyp["status"] = "refuted"
+        hyp.status = HypothesisStatus.REFUTED
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Result",

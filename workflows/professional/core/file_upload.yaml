@@ -1,0 +1,59 @@
+name: file_upload
+description: File upload security review — validation bypass, path traversal, RCE, SSRF
+version: "2.0"
+tags:
+  - core
+  - file_upload
+  - owasp
+
+phases:
+  - id: upload_discovery
+    name: Upload Endpoint Discovery
+    description: Discover all file upload functionality
+    methodology_packs:
+      - file_upload
+    planner_rules:
+      - FileUploadRule
+    steps:
+      - id: discover_uploads
+        name: Discover Upload Endpoints
+        description: Identify all file upload endpoints and their parameters
+        type: ai
+        task_type: reasoning
+        prompt_template: "Identify all file upload functionality at {{ target }}. Look for: multipart form uploads, profile picture uploads, document/file attachments, CSV/Excel imports, avatar/image uploads, and any PUT/POST with file content types"
+        estimated_time_minutes: 10
+        priority: critical
+        completion_criteria:
+          - All upload endpoints identified
+
+  - id: validation_bypass
+    name: Validation Bypass Testing
+    description: Test file type validation, size limits, and content checks
+    steps:
+      - id: test_validation
+        name: Test Validation Bypass
+        description: Bypass file type validation using various techniques
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test file upload validation at {{ target }}. Check: MIME type bypass (Content-Type manipulation), extension bypass (.php5, .phtml, .shtml), magic byte manipulation, double extension, null byte injection, and size limit bypass via chunked encoding"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - Validation bypass techniques tested
+          - Successful uploads documented
+
+  - id: rce_testing
+    name: RCE Testing
+    description: Test for remote code execution via file upload
+    steps:
+      - id: test_rce
+        name: Test File Upload RCE
+        description: Attempt to achieve code execution through file upload
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test for RCE via file upload at {{ target }}. Check: web shell upload to web-accessible directory, .htaccess override, server-side includes, XML/SVG XXE upload, Phar deserialization, and polyglot file creation"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - RCE vectors evaluated
+          - Exploitability assessment complete

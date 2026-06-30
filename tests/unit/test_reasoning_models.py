@@ -11,6 +11,8 @@ from deephunter.reasoning.models import (
     ExperimentStatus,
     Finding,
     FindingSeverity,
+    Hypothesis,
+    HypothesisPriority,
     HypothesisStatus,
     Investigation,
     InvestigationState,
@@ -204,11 +206,12 @@ class TestInvestigation:
         assert len(restored.state.evidence) == 1
         assert restored.state.evidence[0].content == "data"
 
-    def test_hypotheses_as_dicts(self) -> None:
+    def test_hypotheses_as_objects(self) -> None:
         inv = Investigation(target="x")
         inv.state.hypotheses = [
-            {"id": "hyp-1", "title": "H1"},
-            {"id": "hyp-2", "title": "H2"},
+            Hypothesis(title="H1"),
+            Hypothesis(title="H2"),
         ]
         assert len(inv.state.hypotheses) == 2
-        assert inv.state.hypotheses[0]["title"] == "H1"
+        assert inv.state.hypotheses[0].title == "H1"
+        assert inv.state.hypotheses[1].title == "H2"

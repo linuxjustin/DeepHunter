@@ -1,0 +1,62 @@
+name: nextjs
+description: Next.js security review — SSR, API routes, middleware, server actions, SSG
+version: "2.0"
+tags:
+  - framework
+  - nextjs
+  - react
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: nextjs
+
+conditional_phases:
+  - framework_match:
+      - nextjs
+
+phases:
+  - id: nextjs_fingerprint
+    name: Next.js Fingerprinting
+    description: Identify Next.js version and configuration
+    steps:
+      - id: fingerprint_nextjs
+        name: Fingerprint Next.js
+        description: Identify version and detect build-time data exposure
+        type: ai
+        task_type: reasoning
+        prompt_template: "Fingerprint the Next.js application at {{ target }}. Check: source maps enabled, _next/data endpoints, __NEXT_DATA__ script tag for SSG data leaks, middleware routes, and API route discovery via /api/"
+        estimated_time_minutes: 10
+        priority: critical
+        completion_criteria:
+          - Next.js version identified
+          - SSG data exposure checked
+
+  - id: api_routes
+    name: API Route Analysis
+    description: Analyze Next.js API routes for vulnerabilities
+    steps:
+      - id: analyze_api_routes
+        name: Analyze API Routes
+        description: Map and test all API routes
+        type: ai
+        task_type: reasoning
+        prompt_template: "Discover and analyze Next.js API routes at {{ target }}. Check: /api/ endpoints, serverless function exposure, request body validation, middleware authentication gaps, and edge runtime-specific vulnerabilities"
+        estimated_time_minutes: 15
+        priority: critical
+
+  - id: server_actions
+    name: Server Actions Analysis
+    description: Analyze Next.js Server Actions for CSRF and auth bypass
+    steps:
+      - id: analyze_server_actions
+        name: Analyze Server Actions
+        description: Check server action security
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Next.js Server Actions at {{ target }}. Check: CSRF protection on server actions, authentication validation in server actions, direct server action invocation via HTTP, and server action response leakage"
+        estimated_time_minutes: 15
+        priority: high

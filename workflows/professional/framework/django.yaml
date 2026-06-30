@@ -1,0 +1,76 @@
+name: django
+description: Django security review — ORM, admin panel, templates, middleware, DRF
+version: "2.0"
+tags:
+  - framework
+  - django
+  - python
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: django
+
+conditional_phases:
+  - framework_match:
+      - django
+
+phases:
+  - id: django_fingerprint
+    name: Django Fingerprinting
+    description: Identify Django version, settings exposure, and admin panel
+    knowledge_packs:
+      - django
+    methodology_packs:
+      - django
+    steps:
+      - id: fingerprint_django
+        name: Fingerprint Django
+        description: Identify Django version and configuration exposure
+        type: ai
+        task_type: reasoning
+        prompt_template: "Fingerprint Django at {{ target }}. Check: /admin/ panel, DEBUG=True indicators, SECRET_KEY exposure, Django version from HTTP headers, ALLOWED_HOSTS bypass, and CSRF cookie configuration"
+        estimated_time_minutes: 10
+        priority: critical
+
+  - id: orm_analysis
+    name: Django ORM Analysis
+    description: Analyze Django ORM for SQL injection and data exposure
+    steps:
+      - id: analyze_orm
+        name: Analyze Django ORM
+        description: Check for raw SQL, prefetch_related, and select_related issues
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Django ORM at {{ target }}. Check: raw() SQL queries, extra()/annotate() injection, prefetch_related/select_related data leakage, filter() field exposure, and get_object_or_404 information disclosure"
+        estimated_time_minutes: 15
+        priority: critical
+
+  - id: drf_analysis
+    name: DRF Analysis
+    description: Analyze Django REST Framework configuration
+    steps:
+      - id: analyze_drf
+        name: Analyze DRF
+        description: Check serializer, viewset, and permission class configuration
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Django REST Framework at {{ target }}. Check: Browsable API enabled, serializer field exposure, permission class gaps, pagination abuse, and API versioning information disclosure"
+        estimated_time_minutes: 15
+        priority: high
+
+  - id: template_injection
+    name: Template Injection Testing
+    description: Test for Django template injection (SSTI)
+    steps:
+      - id: test_ssti
+        name: Test SSTI
+        description: Test for server-side template injection in Django templates
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test for Django SSTI at {{ target }}. Check: user input in render() calls, template context injection, custom template tag vulnerabilities, and {% autoescape off %} usage"
+        estimated_time_minutes: 15
+        priority: high

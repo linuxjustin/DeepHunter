@@ -1,0 +1,87 @@
+name: rest_api
+description: REST API security review — authentication, authorization, rate limiting, mass assignment
+version: "2.0"
+tags:
+  - core
+  - api
+  - rest
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: api_present
+    type: bool
+    default: true
+
+phases:
+  - id: api_discovery
+    name: API Discovery
+    description: Discover and document all API endpoints
+    methodology_packs:
+      - rest_api
+    knowledge_packs:
+      - rest
+    planner_rules:
+      - EndpointAnalysisRule
+    checkpoints:
+      - api_discovered
+    steps:
+      - id: discover_api_endpoints
+        name: Discover API Endpoints
+        description: Map all REST API endpoints and methods
+        type: ai
+        task_type: reasoning
+        prompt_template: "Map all REST API endpoints for {{ target }}. Include: endpoint paths, HTTP methods, authentication requirements, request/response formats, and rate limiting headers. Note any API documentation endpoints like /swagger, /docs, /openapi.json"
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - All API endpoints documented
+          - API documentation discovered
+
+  - id: api_auth
+    name: API Authentication Testing
+    description: Test API authentication mechanisms
+    steps:
+      - id: test_api_auth
+        name: Test API Authentication
+        description: Test auth headers, token handling, and access controls
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test API authentication for {{ target }}. Check: missing auth headers, token in URL vs header, token expiration handling, API key exposure in responses, and CORS misconfigurations"
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - API auth mechanisms documented
+          - Weaknesses identified
+
+  - id: api_rate_limiting
+    name: Rate Limiting Testing
+    description: Test API rate limiting and abuse prevention
+    steps:
+      - id: test_rate_limits
+        name: Test API Rate Limits
+        description: Evaluate rate limiting effectiveness
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test rate limiting for {{ target }} API endpoints. Check: IP-based vs user-based limiting, rate limit headers, bypass via header manipulation, distributed brute force potential, and GraphQL batching rate limits"
+        estimated_time_minutes: 10
+        priority: high
+        completion_criteria:
+          - Rate limit implementation documented
+
+  - id: mass_assignment
+    name: Mass Assignment Testing
+    description: Test for mass assignment vulnerabilities
+    steps:
+      - id: test_mass_assignment
+        name: Test Mass Assignment
+        description: Check for mass assignment in API request bodies
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test for mass assignment vulnerabilities in {{ target }} API. Check: extra fields in JSON bodies, role/privilege fields, internal ID overwriting, status/published field manipulation, and hidden parameter discovery"
+        estimated_time_minutes: 15
+        priority: high
+        completion_criteria:
+          - Mass assignment tested
+          - Privilege escalation scenarios identified

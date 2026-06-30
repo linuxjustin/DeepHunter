@@ -1,0 +1,59 @@
+name: magento
+description: Magento security review — admin panel, APIs, checkout, SQL injection, SSRF
+version: "2.0"
+tags:
+  - framework
+  - magento
+  - ecommerce
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: magento
+
+conditional_phases:
+  - framework_match:
+      - magento
+
+phases:
+  - id: magento_fingerprint
+    name: Magento Fingerprinting
+    description: Identify Magento edition, version, and installed modules
+    steps:
+      - id: fingerprint_magento
+        name: Fingerprint Magento
+        description: Identify Magento version, edition, and modules
+        type: ai
+        task_type: reasoning
+        prompt_template: "Fingerprint Magento at {{ target }}. Check: /magento_version, /static/version/, /admin route exposure, /rest/ endpoints, /soap/ endpoints, and version-specific CVEs"
+        estimated_time_minutes: 10
+        priority: critical
+
+  - id: api_analysis
+    name: Magento API Analysis
+    description: Analyze Magento REST and SOAP APIs
+    steps:
+      - id: analyze_apis
+        name: Analyze Magento APIs
+        description: Check API authentication, authorization, and data exposure
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Magento APIs at {{ target }}. Check: REST API authentication bypass, SOAP API access, API token generation, customer data exposure via API, admin API access, and GraphQL endpoint analysis"
+        estimated_time_minutes: 20
+        priority: critical
+
+  - id: checkout_analysis
+    name: Checkout Logic Analysis
+    description: Analyze checkout and payment logic for financial abuse
+    steps:
+      - id: analyze_checkout
+        name: Analyze Checkout
+        description: Test for price manipulation, coupon abuse, and payment bypass
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Magento checkout at {{ target }}. Check: price manipulation in POST data, coupon code abuse, gift card balance manipulation, quantity overflow, shipping cost manipulation, and payment method bypass"
+        estimated_time_minutes: 25
+        priority: critical

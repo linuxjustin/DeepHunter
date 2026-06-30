@@ -1,0 +1,70 @@
+name: report_generation
+description: Report generation — executive summary, technical details, evidence, recommendations
+version: "2.0"
+tags:
+  - core
+  - reporting
+  - deliverable
+
+phases:
+  - id: report_drafting
+    name: Report Drafting
+    description: Draft the comprehensive investigation report
+    checkpoints:
+      - report_drafted
+    steps:
+      - id: draft_report
+        name: Draft Investigation Report
+        description: Generate a comprehensive investigation report
+        type: builtin
+        action: draft_report
+        estimated_time_minutes: 15
+        priority: high
+        completion_criteria:
+          - Report drafted
+
+  - id: executive_summary
+    name: Executive Summary
+    description: Generate executive summary
+    steps:
+      - id: generate_exec_summary
+        name: Generate Executive Summary
+        description: Create an executive summary of findings and impact
+        type: ai
+        task_type: report_drafting
+        prompt_template: "Write a professional executive summary for the {{ target }} investigation. Include: scope overview, critical findings summary, risk level, methodology used, key metrics, and prioritized recommendations for remediation"
+        estimated_time_minutes: 10
+        priority: high
+        completion_criteria:
+          - Executive summary written
+
+  - id: technical_appendices
+    name: Technical Appendices
+    description: Generate technical appendices with detailed evidence
+    steps:
+      - id: generate_technical_detail
+        name: Generate Technical Detail
+        description: Compile technical evidence, requests, and responses
+        type: ai
+        task_type: report_drafting
+        prompt_template: "Generate technical appendices for the {{ target }} investigation. Include: complete HTTP request/response dumps, proof-of-concept payloads, evidence screenshots descriptions, vulnerability chain explanations, and attacker/defender perspective"
+        estimated_time_minutes: 20
+        priority: medium
+        completion_criteria:
+          - Technical appendices generated
+
+  - id: report_export
+    name: Report Export
+    description: Export the report in the required format
+    checkpoints:
+      - report_exported
+    steps:
+      - id: export_report
+        name: Export Final Report
+        description: Export the completed report
+        type: builtin
+        action: export_report
+        estimated_time_minutes: 2
+        priority: high
+        completion_criteria:
+          - Report exported successfully

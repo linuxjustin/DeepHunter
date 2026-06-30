@@ -1,0 +1,61 @@
+name: fastapi
+description: FastAPI security review — OpenAPI docs, dependency injection, Pydantic models, WebSocket
+version: "2.0"
+tags:
+  - framework
+  - fastapi
+  - python
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: fastapi
+
+conditional_phases:
+  - framework_match:
+      - fastapi
+
+phases:
+  - id: docs_exposure
+    name: Documentation Exposure
+    description: Check for exposed OpenAPI/Swagger documentation
+    knowledge_packs:
+      - fastapi
+    steps:
+      - id: check_docs
+        name: Check API Docs
+        description: Check for exposed Swagger, Redoc, and OpenAPI schemas
+        type: ai
+        task_type: reasoning
+        prompt_template: "Check FastAPI docs exposure at {{ target }}. Test: /docs, /redoc, /openapi.json, /api/v1/docs, /swagger. Check for schema information leakage about internal endpoints, request/response models, and authentication schemes"
+        estimated_time_minutes: 5
+        priority: critical
+
+  - id: pydantic_analysis
+    name: Pydantic Model Analysis
+    description: Analyze Pydantic model validation for mass assignment and injection
+    steps:
+      - id: analyze_pydantic
+        name: Analyze Pydantic Models
+        description: Check for mass assignment and validation bypass
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze FastAPI/Pydantic at {{ target }}. Check: extra field acceptance in Pydantic models, field type coercion vulnerabilities, missing validation on critical fields, and dependency injection security"
+        estimated_time_minutes: 15
+        priority: high
+
+  - id: dependency_injection
+    name: Dependency Injection Analysis
+    description: Analyze FastAPI dependency injection for security issues
+    steps:
+      - id: analyze_di
+        name: Analyze DI
+        description: Check authentication/authorization dependency injection
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze FastAPI dependency injection at {{ target }}. Check: missing auth dependencies on routes, cached dependency data across requests, global dependency override potential, and sub-dependency security gaps"
+        estimated_time_minutes: 15
+        priority: high

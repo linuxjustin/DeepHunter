@@ -1,0 +1,61 @@
+name: express
+description: Express.js security review — middleware, routing, error handling, session management
+version: "2.0"
+tags:
+  - framework
+  - express
+  - nodejs
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: express
+
+conditional_phases:
+  - framework_match:
+      - express
+
+phases:
+  - id: middleware_analysis
+    name: Middleware Analysis
+    description: Analyze Express middleware stack for security gaps
+    knowledge_packs:
+      - express
+    steps:
+      - id: analyze_middleware
+        name: Analyze Middleware
+        description: Check for missing or misconfigured security middleware
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Express middleware at {{ target }}. Check: helmet configuration, CORS settings, rate limiting, body parser size limits, error handler that leaks stack traces, and authentication middleware gaps"
+        estimated_time_minutes: 10
+        priority: critical
+
+  - id: routing_analysis
+    name: Routing Analysis
+    description: Analyze Express route configuration for exposed endpoints
+    steps:
+      - id: analyze_routes
+        name: Analyze Routes
+        description: Map Express routes and check for exposed internal endpoints
+        type: ai
+        task_type: reasoning
+        prompt_template: "Map Express routes at {{ target }}. Check: parameter pollution in route params, regex injection in route patterns, static file directory traversal, and exposed internal routes via error messages"
+        estimated_time_minutes: 15
+        priority: high
+
+  - id: error_handling
+    name: Error Handling Analysis
+    description: Analyze error handling for information disclosure
+    steps:
+      - id: analyze_errors
+        name: Analyze Error Handling
+        description: Trigger errors and analyze responses
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test Express error handling at {{ target }}. Check: stack trace leakage, internal path disclosure, database error details, debug mode indicators, and async error uncaught exception behavior"
+        estimated_time_minutes: 10
+        priority: high

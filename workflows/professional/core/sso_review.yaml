@@ -1,0 +1,79 @@
+name: sso_review
+description: SSO / OAuth review — OAuth flow, SAML assertions, JWT validation, OpenID Connect
+version: "2.0"
+tags:
+  - core
+  - sso
+  - oauth
+  - saml
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: sso_enabled
+    type: bool
+    default: false
+
+conditional_phases:
+  - condition: sso_enabled
+
+phases:
+  - id: oauth_flow
+    name: OAuth Flow Analysis
+    description: Analyze OAuth flow for security vulnerabilities
+    knowledge_packs:
+      - oauth
+    methodology_packs:
+      - oauth
+    steps:
+      - id: analyze_oauth
+        name: Analyze OAuth Flow
+        description: Map the OAuth flow and check for implementation flaws
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze the OAuth implementation at {{ target }}. Check: CSRF on callback endpoint, redirect_uri validation bypass, state parameter usage, code/token leakage in referrer headers, PKCE enforcement, authorization code interception, and token swapping vulnerabilities"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - OAuth flow fully documented
+          - Vulnerabilities identified
+
+  - id: jwt_analysis
+    name: JWT Analysis
+    description: Analyze JWT handling and validation
+    knowledge_packs:
+      - jwt
+    methodology_packs:
+      - jwt
+    steps:
+      - id: analyze_jwt
+        name: Analyze JWT
+        description: Check JWT signature validation, algorithm handling, and claims
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze JWT tokens from {{ target }}. Check: alg=none attack, RS256 to HS256 key confusion, JWK header injection, exp/nbf claim validation, jku/x5u URL validation, KID path traversal, and signature stripping"
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - JWT analysis complete
+          - Algorithm confusion tested
+
+  - id: saml_analysis
+    name: SAML Analysis
+    description: Analyze SAML SSO implementation
+    knowledge_packs:
+      - saml
+    methodology_packs:
+      - saml
+    steps:
+      - id: analyze_saml
+        name: Analyze SAML
+        description: Check SAML assertion validation and XML signature wrapping
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze SAML implementation at {{ target }}. Check: XML signature wrapping (XSW), Assertion Consumer Service URL validation, ResponseReplay attacks, Comment injection, IDP-initiated SSO abuse, and certificate validation weaknesses"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - SAML implementation analyzed

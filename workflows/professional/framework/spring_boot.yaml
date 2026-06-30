@@ -1,0 +1,65 @@
+name: spring_boot
+description: Spring Boot security review — Actuator, SpEL injection, method security, OAuth2
+version: "2.0"
+tags:
+  - framework
+  - spring
+  - java
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: spring_boot
+
+conditional_phases:
+  - framework_match:
+      - spring_boot
+
+phases:
+  - id: actuator_analysis
+    name: Actuator Analysis
+    description: Analyze Spring Boot Actuator endpoints
+    knowledge_packs:
+      - spring_boot
+    methodology_packs:
+      - spring_boot
+    steps:
+      - id: check_actuator
+        name: Check Actuator
+        description: Discover and analyze Spring Boot Actuator endpoints
+        type: ai
+        task_type: reasoning
+        prompt_template: "Check Spring Boot Actuator at {{ target }}. Test: /actuator, /actuator/health, /actuator/env, /actuator/beans, /actuator/mappings, /actuator/loggers, /heapdump, /threaddump, and /actuator/configprops for sensitive data exposure"
+        estimated_time_minutes: 10
+        priority: critical
+        completion_criteria:
+          - Actuator exposure assessed
+
+  - id: spel_injection
+    name: SpEL Injection Testing
+    description: Test for Spring Expression Language injection
+    steps:
+      - id: test_spel
+        name: Test SpEL Injection
+        description: Identify and test SpEL injection points
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test for SpEL injection at {{ target }}. Check: user input in @Value annotations, SpEL in validation annotations, Spring Data/Query parameters, and template engines that evaluate SpEL expressions"
+        estimated_time_minutes: 20
+        priority: critical
+
+  - id: method_security
+    name: Method Security Analysis
+    description: Analyze @PreAuthorize, @PostAuthorize, and role annotations
+    steps:
+      - id: analyze_security
+        name: Analyze Method Security
+        description: Check annotation-based access control
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Spring method security at {{ target }}. Check: @PreAuthorize bypass potential, role hierarchy misconfigurations, @Secured annotation coverage, and expression-based access control vulnerabilities"
+        estimated_time_minutes: 15
+        priority: high

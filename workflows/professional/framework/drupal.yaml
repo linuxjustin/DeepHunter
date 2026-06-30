@@ -1,0 +1,59 @@
+name: drupal
+description: Drupal security review — modules, permissions, configuration, REST, Twig
+version: "2.0"
+tags:
+  - framework
+  - drupal
+  - cms
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: drupal
+
+conditional_phases:
+  - framework_match:
+      - drupal
+
+phases:
+  - id: drupal_fingerprint
+    name: Drupal Fingerprinting
+    description: Identify Drupal version, modules, and theme
+    steps:
+      - id: fingerprint_drupal
+        name: Fingerprint Drupal
+        description: Identify version, contributed modules, and theme
+        type: ai
+        task_type: reasoning
+        prompt_template: "Fingerprint Drupal at {{ target }}. Check: /CHANGELOG.txt, /core/CHANGELOG.txt, /node/1, /user/1, generator meta tag, CSS/JS path version disclosure, and /rest/ endpoint exposure"
+        estimated_time_minutes: 10
+        priority: critical
+
+  - id: permissions
+    name: Permission Analysis
+    description: Analyze Drupal permission configuration
+    steps:
+      - id: analyze_permissions
+        name: Analyze Permissions
+        description: Check for permission bypass and access control issues
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Drupal permissions at {{ target }}. Check: anonymous user permissions, authenticated user permissions, role-based access control, node access bypass, and unpublished content access"
+        estimated_time_minutes: 15
+        priority: high
+
+  - id: twig_ssti
+    name: Twig SSTI Testing
+    description: Test for Twig template injection
+    steps:
+      - id: test_twig_ssti
+        name: Test Twig SSTI
+        description: Test for server-side template injection in Twig
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test for Twig SSTI at {{ target }}. Check: user input in Twig templates, custom Twig extension vulnerabilities, Twig autoescape bypass, and Drupal-specific filter injection"
+        estimated_time_minutes: 15
+        priority: high

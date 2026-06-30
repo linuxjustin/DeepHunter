@@ -1,0 +1,64 @@
+name: websocket
+description: WebSocket security review — authentication, authorization, injection, DoS
+version: "2.0"
+tags:
+  - core
+  - websocket
+  - realtime
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: websocket_enabled
+    type: bool
+    default: false
+
+conditional_phases:
+  - condition: websocket_enabled
+
+phases:
+  - id: websocket_discovery
+    name: WebSocket Discovery
+    description: Discover WebSocket endpoints and connection parameters
+    steps:
+      - id: discover_ws
+        name: Discover WebSocket Endpoints
+        description: Find all WebSocket connections and their handshake parameters
+        type: ai
+        task_type: reasoning
+        prompt_template: "Discover WebSocket endpoints at {{ target }}. Check: wss:// connections, WebSocket handshake in browser dev tools, SockJS endpoints, Socket.io namespaces, and any ws:// fallback connections"
+        estimated_time_minutes: 10
+        priority: high
+        completion_criteria:
+          - All WebSocket endpoints discovered
+
+  - id: ws_auth
+    name: WebSocket Authentication Testing
+    description: Test authentication and authorization in WebSocket connections
+    steps:
+      - id: test_ws_auth
+        name: Test WebSocket Auth
+        description: Verify authentication is required for WebSocket connections
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test WebSocket authentication at {{ target }}. Check: unauthenticated WebSocket access, token reuse across connections, authorization verification per message, and session invalidation on disconnect"
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - WebSocket auth mechanism documented
+
+  - id: ws_injection
+    name: WebSocket Injection Testing
+    description: Test for injection vulnerabilities via WebSocket messages
+    steps:
+      - id: test_ws_injection
+        name: Test WebSocket Injection
+        description: Test for XSS, SQLi, and command injection via WebSocket messages
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test WebSocket message injection at {{ target }}. Check: XSS in WebSocket messages rendered in DOM, SQL injection via WebSocket data, NoSQL injection, command injection, and prototype pollution via JSON messages"
+        estimated_time_minutes: 20
+        priority: high
+        completion_criteria:
+          - Injection testing complete

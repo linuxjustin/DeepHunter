@@ -6,10 +6,12 @@ from pathlib import Path
 
 import pytest
 
+from deephunter.core.types import BugClass
 from deephunter.reasoning.events import (
     HypothesisCreatedEvent,
     ObservationCreatedEvent,
 )
+from deephunter.reasoning.models import HypothesisStatus
 from deephunter.reasoning.session import InvestigationSession
 
 
@@ -88,30 +90,30 @@ class TestInvestigationSession:
             technologies=["react", "nodejs"],
             observation_ids=[obs.id],
         )
-        assert hyp["id"].startswith("hyp-")
-        assert hyp["title"] == "Test for XSS"
-        assert obs.id in hyp.get("observation_ids", [])
+        assert hyp.id.startswith("hyp-")
+        assert hyp.title == "Test for XSS"
+        assert obs.id in hyp.observation_ids
         assert len(session.state.hypotheses) == 1
 
     def test_create_hypothesis_no_graph_node(self) -> None:
-        """Hypotheses are stored as dicts, not added to the graph."""
+        """Hypotheses are stored as Hypothesis objects, not added to the graph."""
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="XSS", description="Cross-site scripting")
-        assert session.graph.get_node(hyp["id"]) is None
+        assert session.graph.get_node(hyp.id) is None
 
     def test_create_experiment(self) -> None:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="SQLi", description="Test SQL injection")
 
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test login endpoint",
             procedure="Send SQLi payloads",
             expected_result="RCE",
         )
         assert exp is not None
         assert exp.id.startswith("exp-")
-        assert exp.hypothesis_id == hyp["id"]
+        assert exp.hypothesis_id == hyp.id
         assert exp.status.value == "planned"
         assert len(session.state.experiments) == 1
 
@@ -129,7 +131,7 @@ class TestInvestigationSession:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="Test", description="Test")
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Res",
@@ -159,7 +161,7 @@ class TestInvestigationSession:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="Test", description="Test")
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Res",
@@ -180,7 +182,7 @@ class TestInvestigationSession:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="SQLi", description="SQL injection")
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Res",
@@ -190,7 +192,7 @@ class TestInvestigationSession:
 
         fnd = session.create_finding(
             title="SQL Injection Found",
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="SQL injection in login",
             bug_classes=["SQL_INJECTION"],
             severity="high",
@@ -204,7 +206,7 @@ class TestInvestigationSession:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="SQLi", description="SQL injection")
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Test",
             procedure="Proc",
             expected_result="Res",
@@ -214,21 +216,21 @@ class TestInvestigationSession:
 
         fnd = session.create_finding(
             title="SQLi Found",
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Found",
             bug_classes=["SQL_INJECTION"],
             severity="high",
             experiment_ids=[exp.id],
         )
-        updated_hyp = [h for h in session.state.hypotheses if h["id"] == hyp["id"]][0]
-        assert updated_hyp["finding_id"] == fnd.id
+        updated_hyp = [h for h in session.state.hypotheses if h.id == hyp.id][0]
+        assert updated_hyp.finding_id == fnd.id
 
     def test_update_confidence_no_experiments(self) -> None:
         session = InvestigationSession.new("https://example.com")
         hyp = session.create_hypothesis(title="Test", description="Test")
-        session.update_hypothesis_confidence(hyp["id"])
-        hyp_updated = [h for h in session.state.hypotheses if h["id"] == hyp["id"]][0]
-        assert hyp_updated.get("confidence", 0) >= 0
+        session.update_hypothesis_confidence(hyp.id)
+        hyp_updated = [h for h in session.state.hypotheses if h.id == hyp.id][0]
+        assert hyp_updated.confidence >= 0
 
     def test_update_confidence_with_evidence(self) -> None:
         session = InvestigationSession.new("https://example.com")
@@ -237,15 +239,14 @@ class TestInvestigationSession:
             title="Test", description="Test", observation_ids=[obs.id],
         )
         session.add_evidence(observation_id=obs.id, content="Evidence", source="test")
-        hyp["observation_ids"] = [obs.id]
         # The evidence_ids have to be linked too
         ev = [e for e in session.state.evidence if e.observation_id == obs.id]
         if ev:
-            hyp["evidence_ids"] = [e.id for e in ev]
+            hyp.evidence_ids = [e.id for e in ev]
 
-        session.update_hypothesis_confidence(hyp["id"])
-        hyp_updated = [h for h in session.state.hypotheses if h["id"] == hyp["id"]][0]
-        assert hyp_updated.get("confidence", 0) > 0
+        session.update_hypothesis_confidence(hyp.id)
+        hyp_updated = [h for h in session.state.hypotheses if h.id == hyp.id][0]
+        assert hyp_updated.confidence > 0
 
     def test_update_confidence_unknown_hypothesis(self) -> None:
         session = InvestigationSession.new("https://example.com")
@@ -262,7 +263,7 @@ class TestInvestigationSession:
         session.create_observation("other", description="Obs 1")
         hyp = session.create_hypothesis(title="Hyp 1", description="Desc")
         exp = session.create_experiment(
-            hypothesis_id=hyp["id"],
+            hypothesis_id=hyp.id,
             description="Exp 1",
             procedure="Proc",
             expected_result="Res",
@@ -279,19 +280,19 @@ class TestInvestigationSession:
         session = InvestigationSession.new("https://example.com")
         obs = session.create_observation("other", description="Suspicious")
         hyp = session.create_hypothesis(title="SQLi", description="SQLi", observation_ids=[obs.id])
-        exp = session.create_experiment(hypothesis_id=hyp["id"], description="Test", procedure="P", expected_result="R")
+        exp = session.create_experiment(hypothesis_id=hyp.id, description="Test", procedure="P", expected_result="R")
         assert exp is not None
         session.record_result(experiment_id=exp.id, status="completed", actual_result="Found")
         pvt = session.create_pivot(description="Pivot", rationale="R", reason="other", source_experiment_id=exp.id)
-        fnd = session.create_finding(title="F", hypothesis_id=hyp["id"], description="D", bug_classes=[], severity="high", experiment_ids=[exp.id])
+        fnd = session.create_finding(title="F", hypothesis_id=hyp.id, description="D", bug_classes=[], severity="high", experiment_ids=[exp.id])
 
         graph = session.graph
         assert graph.get_node(obs.id) is not None
         assert graph.get_node(exp.id) is not None
         assert graph.get_node(pvt.id) is not None
         assert graph.get_node(fnd.id) is not None
-        # Hypothesis is a dict, not in the graph
-        assert graph.get_node(hyp["id"]) is None
+        # Hypothesis is not in the graph (not a graph node)
+        assert graph.get_node(hyp.id) is None
 
     def test_save_creates_parent_dirs(self, tmp_path: Path) -> None:
         nested = tmp_path / "a" / "b" / "session.json"

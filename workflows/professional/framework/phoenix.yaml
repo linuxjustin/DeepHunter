@@ -1,0 +1,59 @@
+name: phoenix
+description: Phoenix/Elixir security review — LiveView, Ecto, channels, router, authentication
+version: "2.0"
+tags:
+  - framework
+  - phoenix
+  - elixir
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: phoenix
+
+conditional_phases:
+  - framework_match:
+      - phoenix
+
+phases:
+  - id: phoenix_fingerprint
+    name: Phoenix Fingerprinting
+    description: Identify Phoenix version and LiveView configuration
+    steps:
+      - id: fingerprint_phoenix
+        name: Fingerprint Phoenix
+        description: Identify Phoenix version and framework configuration
+        type: ai
+        task_type: reasoning
+        prompt_template: "Fingerprint Phoenix at {{ target }}. Check: Phoenix version from headers, LiveView socket endpoint exposure, /api/ route patterns, channel endpoint discovery, and WebSocket configuration"
+        estimated_time_minutes: 10
+        priority: critical
+
+  - id: liveview_analysis
+    name: LiveView Analysis
+    description: Analyze Phoenix LiveView for security vulnerabilities
+    steps:
+      - id: analyze_liveview
+        name: Analyze LiveView
+        description: Check LiveView for authorization and data exposure
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Phoenix LiveView at {{ target }}. Check: LiveView mount authorization, live_render assigns exposure, phx-value tampering, event handler parameter injection, and internal LiveView data leakage via WebSocket"
+        estimated_time_minutes: 20
+        priority: critical
+
+  - id: ecto_analysis
+    name: Ecto Query Analysis
+    description: Analyze Ecto queries for injection vulnerabilities
+    steps:
+      - id: analyze_ecto
+        name: Analyze Ecto Queries
+        description: Check for fragment injection and query manipulation
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Ecto queries at {{ target }}. Check: Ecto fragment with user input, Repo.all with dynamic conditions, parameterized query bypass, and Ecto.Schema field exposure in API responses"
+        estimated_time_minutes: 15
+        priority: high

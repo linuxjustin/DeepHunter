@@ -1,0 +1,100 @@
+name: authentication_review
+description: Authentication review — login flows, password policies, MFA, session handling
+version: "2.0"
+tags:
+  - core
+  - authentication
+  - owasp
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: auth_method
+    type: string
+    default: session_cookie
+    description: Authentication method (jwt, oauth2, session_cookie, saml, ldap)
+
+phases:
+  - id: login_flow_analysis
+    name: Login Flow Analysis
+    description: Analyze authentication endpoints and login mechanisms
+    methodology_packs:
+      - authentication
+    knowledge_packs:
+      - authentication
+    planner_rules:
+      - AuthenticationRule
+    checkpoints:
+      - authentication_flow_analyzed
+    steps:
+      - id: identify_auth_endpoints
+        name: Identify Auth Endpoints
+        description: Map all authentication-related endpoints
+        type: ai
+        task_type: reasoning
+        prompt_template: "Map all authentication endpoints for {{ target }}. Include login, register, forgot password, reset password, MFA setup, and API auth endpoints. Method: {{ auth_method }}"
+        estimated_time_minutes: 10
+        priority: critical
+        completion_criteria:
+          - All auth endpoints mapped
+          - Authentication flow documented
+
+  - id: credential_testing
+    name: Credential Testing
+    description: Test credential handling, password policies, and rate limiting
+    steps:
+      - id: test_password_policy
+        name: Test Password Policy
+        description: Evaluate password complexity requirements and recovery mechanisms
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze the password policy for {{ target }}. Test for: minimum length, complexity requirements, common password blocking, password reset logic, and credential stuffing protections"
+        estimated_time_minutes: 15
+        priority: high
+        completion_criteria:
+          - Password policy documented
+          - Weaknesses identified
+      - id: test_rate_limiting
+        name: Test Rate Limiting
+        description: Evaluate rate limiting on login and auth endpoints
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze rate limiting for {{ target }} login endpoints. Check for: account lockout, IP-based rate limiting, progressive delays, and CAPTCHA implementation"
+        estimated_time_minutes: 10
+        priority: high
+        completion_criteria:
+          - Rate limiting status documented
+          - Bypass techniques evaluated
+
+  - id: mfa_analysis
+    name: MFA Analysis
+    description: Analyze multi-factor authentication implementation
+    steps:
+      - id: analyze_mfa
+        name: Analyze MFA
+        description: Evaluate MFA implementation for bypasses
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze MFA implementation for {{ target }}. Check for: MFA bypass on API endpoints, push notification fatigue, backup code abuse, TOTP window attacks, and SMS interception risks"
+        estimated_time_minutes: 15
+        priority: high
+        completion_criteria:
+          - MFA implementation documented
+          - Bypass scenarios identified
+
+  - id: session_analysis
+    name: Session Token Analysis
+    description: Analyze session tokens for security weaknesses
+    steps:
+      - id: analyze_sessions
+        name: Analyze Session Tokens
+        description: Evaluate session token generation, transmission, and storage
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze session handling for {{ target }}. Check for: JWT none algorithm, token expiration, secure cookie flags, session fixation, concurrent session handling, and logout behavior"
+        estimated_time_minutes: 10
+        priority: critical
+        completion_criteria:
+          - Token analysis complete
+          - Vulnerabilities identified

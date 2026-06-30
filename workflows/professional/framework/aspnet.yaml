@@ -1,0 +1,63 @@
+name: aspnet
+description: ASP.NET Core security review — middleware, authentication, authorization, Razor, API controllers
+version: "2.0"
+tags:
+  - framework
+  - aspnet
+  - dotnet
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: aspnet
+
+conditional_phases:
+  - framework_match:
+      - aspnet
+
+phases:
+  - id: aspnet_fingerprint
+    name: ASP.NET Fingerprinting
+    description: Identify ASP.NET version, MVC/Razor configuration
+    knowledge_packs:
+      - aspnet
+    methodology_packs:
+      - aspnet
+    steps:
+      - id: fingerprint_aspnet
+        name: Fingerprint ASP.NET
+        description: Identify version and configuration details
+        type: ai
+        task_type: reasoning
+        prompt_template: "Fingerprint ASP.NET at {{ target }}. Check: ASP.NET version from headers, MVC vs Razor Pages vs Blazor, /swagger endpoints, /health endpoints, SignalR hubs, and detailed error pages enabled"
+        estimated_time_minutes: 10
+        priority: critical
+
+  - id: auth_analysis
+    name: Authentication Analysis
+    description: Analyze ASP.NET authentication middleware
+    steps:
+      - id: analyze_auth
+        name: Analyze Auth
+        description: Check Identity, JWT, and cookie authentication
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze ASP.NET authentication at {{ target }}. Check: Identity configuration, JWT bearer token validation, cookie authentication settings, OpenID Connect configuration, and antiforgery token validation"
+        estimated_time_minutes: 15
+        priority: critical
+
+  - id: razor_analysis
+    name: Razor View Analysis
+    description: Analyze Razor views for XSS and injection
+    steps:
+      - id: analyze_razor
+        name: Analyze Razor Views
+        description: Check for XSS in Razor templates
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze ASP.NET Razor views at {{ target }}. Check: @Html.Raw usage, @helper method injection, ViewBag/ViewData XSS, partial view parameter injection, and tag helper security"
+        estimated_time_minutes: 15
+        priority: high

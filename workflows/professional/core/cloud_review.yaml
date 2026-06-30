@@ -1,0 +1,67 @@
+name: cloud_review
+description: Cloud infrastructure review — S3 buckets, IAM, serverless, container security
+version: "2.0"
+tags:
+  - core
+  - cloud
+  - infrastructure
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: cloud_provider
+    type: string
+    description: Detected cloud provider
+
+phases:
+  - id: provider_identification
+    name: Cloud Provider Identification
+    description: Identify cloud provider and services in use
+    knowledge_packs:
+      - cloud
+    methodology_packs:
+      - cloud
+    planner_rules:
+      - CloudProviderRule
+    steps:
+      - id: identify_cloud
+        name: Identify Cloud Provider
+        description: Determine cloud provider from IP ranges, headers, and DNS
+        type: builtin
+        action: identify_technologies
+        estimated_time_minutes: 5
+        priority: critical
+        completion_criteria:
+          - Cloud provider identified
+          - Services inventory started
+
+  - id: storage_analysis
+    name: Storage Analysis
+    description: Analyze cloud storage configuration and exposure
+    steps:
+      - id: analyze_storage
+        name: Analyze Cloud Storage
+        description: Check for exposed S3 buckets, Blob storage, or GCS buckets
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze cloud storage for {{ target }}. Check: open S3/Azure/GCP buckets, bucket listing enabled, bucket policy misconfigurations, public access settings, and storage URL patterns in application responses. Provider: {{ cloud_provider }}"
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - Storage configuration analyzed
+
+  - id: iam_analysis
+    name: IAM Analysis
+    description: Analyze IAM configuration and permissions
+    steps:
+      - id: analyze_iam
+        name: Analyze IAM Configuration
+        description: Identify IAM roles, policies, and permission issues
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze IAM security for {{ target }}. Check: overly permissive roles, unused credentials, cross-account access, service account key exposure, and privilege escalation paths. Provider: {{ cloud_provider }}"
+        estimated_time_minutes: 15
+        priority: high
+        completion_criteria:
+          - IAM risks documented

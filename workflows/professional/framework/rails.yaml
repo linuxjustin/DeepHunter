@@ -1,0 +1,63 @@
+name: rails
+description: Ruby on Rails security review — ActiveRecord, views, routes, asset pipeline
+version: "2.0"
+tags:
+  - framework
+  - rails
+  - ruby
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: rails
+
+conditional_phases:
+  - framework_match:
+      - rails
+
+phases:
+  - id: rails_fingerprint
+    name: Rails Fingerprinting
+    description: Identify Rails version and configuration
+    knowledge_packs:
+      - rails
+    methodology_packs:
+      - rails
+    steps:
+      - id: fingerprint_rails
+        name: Fingerprint Rails
+        description: Identify Rails version and check common exposure
+        type: ai
+        task_type: reasoning
+        prompt_template: "Fingerprint Rails at {{ target }}. Check: /rails/info/properties, /rails/info/routes, asset pipeline digest usage, SECRET_KEY_BASE exposure, and session cookie configuration"
+        estimated_time_minutes: 10
+        priority: critical
+
+  - id: activerecord_analysis
+    name: ActiveRecord Analysis
+    description: Analyze ActiveRecord for SQL injection and mass assignment
+    steps:
+      - id: analyze_ar
+        name: Analyze ActiveRecord
+        description: Check for vulnerable query patterns
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze ActiveRecord at {{ target }}. Check: find_by_sql usage, where() interpolation, order() injection, group() injection, having() injection, and strong parameters bypass for mass assignment"
+        estimated_time_minutes: 15
+        priority: critical
+
+  - id: view_ssti
+    name: View SSTI Testing
+    description: Test for ERB/Haml/Slim template injection
+    steps:
+      - id: test_view_ssti
+        name: Test View SSTI
+        description: Test for SSTI in Rails view templates
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test for Rails SSTI at {{ target }}. Check: user input in render() calls, raw/ html_safe usage, ERB template evaluation, Haml/Slim template injection, and partial rendering vulnerabilities"
+        estimated_time_minutes: 15
+        priority: high

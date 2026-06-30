@@ -1,0 +1,85 @@
+name: business_logic
+description: Business logic review — workflow flaws, race conditions, financial logic, state manipulation
+version: "2.0"
+tags:
+  - core
+  - business_logic
+  - owasp
+
+variables:
+  - name: target
+    type: string
+    required: true
+
+phases:
+  - id: workflow_analysis
+    name: Business Workflow Analysis
+    description: Map and analyze critical business workflows
+    methodology_packs:
+      - business_logic
+    knowledge_packs:
+      - business_logic
+    planner_rules:
+      - BusinessLogicRule
+    checkpoints:
+      - workflows_mapped
+    steps:
+      - id: map_workflows
+        name: Map Business Workflows
+        description: Map critical business workflows for analysis
+        type: ai
+        task_type: reasoning
+        prompt_template: "Map critical business workflows for {{ target }}. Identify: user registration flow, checkout/payment flow, account upgrade flow, content creation flow, password reset flow, and any multi-step processes"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - All critical workflows mapped
+          - Multi-step processes documented
+
+  - id: race_conditions
+    name: Race Condition Testing
+    description: Test for race conditions in critical operations
+    steps:
+      - id: test_race_conditions
+        name: Test Race Conditions
+        description: Identify and test race condition candidates
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze {{ target }} for race condition vulnerabilities. Check: coupon/ discount application, account balance operations, quantity manipulation during checkout, like/vote operations, file upload race conditions, and email verification bypass"
+        estimated_time_minutes: 20
+        priority: high
+        completion_criteria:
+          - Race condition candidates identified
+          - Attack scenarios documented
+
+  - id: state_manipulation
+    name: State Manipulation Testing
+    description: Test for improper state handling in multi-step processes
+    steps:
+      - id: test_state_manipulation
+        name: Test State Manipulation
+        description: Test improper state transitions in multi-step forms
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test state manipulation vulnerabilities for {{ target }}. Check: skipping steps in multi-step forms, replaying steps, parameter tampering between steps, direct access to step URLs, and incomplete workflow state handling"
+        estimated_time_minutes: 15
+        priority: high
+        completion_criteria:
+          - State manipulation tested
+          - Access control gaps identified
+
+  - id: financial_logic
+    name: Financial Logic Testing
+    description: Test financial logic for manipulation vulnerabilities
+    steps:
+      - id: test_financial_logic
+        name: Test Financial Logic
+        description: Test pricing, currency, and payment manipulation
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test financial logic vulnerabilities for {{ target }}. Check: price/quantity manipulation, currency conversion exploits, integer overflow in financial calculations, coupon stacking/abuse, refund logic manipulation, and fee bypass"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - Financial logic tested
+          - Manipulation scenarios documented

@@ -1,0 +1,81 @@
+name: laravel
+description: Laravel security review — Eloquent, Blade, Artisan, Sanctum, Horizon, Queues
+version: "2.0"
+tags:
+  - framework
+  - laravel
+  - php
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: laravel
+
+conditional_phases:
+  - framework_match:
+      - laravel
+
+phases:
+  - id: laravel_fingerprint
+    name: Laravel Fingerprinting
+    description: Identify Laravel version, packages, and configuration exposure
+    knowledge_packs:
+      - laravel
+    methodology_packs:
+      - laravel
+    planner_rules:
+      - FrameworkDetectionRule
+    steps:
+      - id: fingerprint_laravel
+        name: Fingerprint Laravel
+        description: Identify Laravel version and installed packages
+        type: ai
+        task_type: reasoning
+        prompt_template: "Fingerprint the Laravel application at {{ target }}. Check: /debugbar, /vendor, /storage/logs, .env exposure, APP_DEBUG status, Laravel debug mode, Telescope/Horizon dashboards, and version-specific CVEs"
+        estimated_time_minutes: 10
+        priority: critical
+        completion_criteria:
+          - Laravel version identified
+          - Debug mode status known
+
+  - id: eloquent_analysis
+    name: Eloquent ORM Analysis
+    description: Analyze Eloquent ORM for SQL injection and mass assignment
+    steps:
+      - id: analyze_eloquent
+        name: Analyze Eloquent ORM
+        description: Test for mass assignment, SQL injection, and N+1 issues
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Eloquent ORM usage at {{ target }}. Check: mass assignment ($fillable/$guarded), raw SQL in queries, N+1 query potential, attribute casting vulnerabilities, and eager loading abuse for data leakage"
+        estimated_time_minutes: 15
+        priority: critical
+
+  - id: sanctum_passport
+    name: Sanctum / Passport Analysis
+    description: Analyze API authentication implementation
+    steps:
+      - id: analyze_auth
+        name: Analyze API Auth
+        description: Check Sanctum/Passport configuration
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze Laravel API authentication at {{ target }}. Check: Sanctum SPA vs token-based auth, Passport token scopes, token expiration, CSRF protection for Sanctum, and personal access token abuse"
+        estimated_time_minutes: 15
+        priority: critical
+
+  - id: blade_ssti
+    name: Blade SSTI Testing
+    description: Test for Server-Side Template Injection in Blade
+    steps:
+      - id: test_blade_ssti
+        name: Test Blade SSTI
+        description: Test for SSTI in Blade templates
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test for Blade SSTI at {{ target }}. Check: user input rendered in Blade templates, {!! !!} unescaped output, @php directives in templates, and custom Blade directive injection"
+        estimated_time_minutes: 15
+        priority: high

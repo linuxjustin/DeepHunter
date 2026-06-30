@@ -1,0 +1,130 @@
+name: initial_recon
+description: Initial reconnaissance — subdomain enumeration, DNS resolution, port scanning, and HTTP probing
+version: "2.0"
+tags:
+  - core
+  - recon
+  - discovery
+
+variables:
+  - name: target
+    type: string
+    required: true
+    description: Target domain or URL
+
+phases:
+  - id: scope_definition
+    name: Scope Definition
+    description: Load and validate the investigation scope
+    checkpoints:
+      - scope_loaded
+    steps:
+      - id: load_scope
+        name: Load Target Scope
+        description: Load and validate scope from target definition
+        type: builtin
+        action: load_scope
+        estimated_time_minutes: 2
+        priority: high
+        completion_criteria:
+          - Target scope validated
+          - In-scope assets identified
+
+  - id: subdomain_enumeration
+    name: Subdomain Enumeration
+    description: Enumerate subdomains using passive and active techniques
+    methodology_packs:
+      - recon
+    knowledge_packs:
+      - dns
+    planner_rules:
+      - ReconRule
+    checkpoints:
+      - subdomains_enumerated
+    steps:
+      - id: passive_enum
+        name: Passive Subdomain Enumeration
+        description: Enumerate subdomains using passive sources
+        type: builtin
+        action: import_recon
+        estimated_time_minutes: 10
+        priority: critical
+        required_inputs:
+          - target
+        expected_outputs:
+          - Subdomain list
+        evidence_requirements:
+          - description: Subdomain discovery results
+            evidence_type: recon_artifact
+            required: true
+        completion_criteria:
+          - All passive sources queried
+          - Initial subdomain list compiled
+      - id: dns_resolution
+        name: DNS Resolution
+        description: Resolve discovered subdomains to IP addresses
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze DNS resolution results for {{ target }} and identify any load balancers, CDNs, or WAFs"
+        depends_on:
+          - passive_enum
+        estimated_time_minutes: 5
+        priority: high
+        completion_criteria:
+          - DNS records collected for all subdomains
+
+  - id: port_scanning
+    name: Port Scanning
+    description: Scan discovered hosts for open ports and services
+    depends_on:
+      - scope_definition
+      - subdomain_enumeration
+    checkpoints:
+      - ports_scanned
+    steps:
+      - id: port_scan
+        name: Port Scan
+        description: Scan for open ports on discovered hosts
+        type: builtin
+        action: import_recon
+        estimated_time_minutes: 15
+        priority: high
+        completion_criteria:
+          - Open ports identified
+          - Service versions captured
+
+  - id: http_probing
+    name: HTTP Probing
+    description: Probe open HTTP/HTTPS ports for live hosts
+    depends_on:
+      - port_scanning
+    checkpoints:
+      - http_probed
+    steps:
+      - id: http_probe
+        name: HTTP Probe
+        description: Identify live web servers and capture response headers
+        type: builtin
+        action: import_recon
+        estimated_time_minutes: 10
+        priority: high
+        expected_outputs:
+          - Live host list
+          - HTTP response headers
+        completion_criteria:
+          - All live hosts identified
+          - Initial technology fingerprints captured
+
+  - id: evidence_collection
+    name: Evidence Collection
+    description: Collect and organize recon evidence
+    steps:
+      - id: collect_evidence
+        name: Collect Recon Evidence
+        description: Store all recon findings as structured evidence
+        type: builtin
+        action: collect_evidence
+        estimated_time_minutes: 5
+        priority: medium
+        completion_criteria:
+          - All recon results stored as evidence

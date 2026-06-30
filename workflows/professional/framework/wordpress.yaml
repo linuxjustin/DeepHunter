@@ -1,0 +1,68 @@
+name: wordpress
+description: WordPress security review — plugins, themes, users, XML-RPC, REST API, hardening
+version: "2.0"
+tags:
+  - framework
+  - wordpress
+  - cms
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: framework
+    type: string
+    default: wordpress
+
+conditional_phases:
+  - framework_match:
+      - wordpress
+
+phases:
+  - id: wp_fingerprint
+    name: WordPress Fingerprinting
+    description: Identify WordPress version, plugins, and themes
+    knowledge_packs:
+      - wordpress
+    methodology_packs:
+      - wordpress
+    steps:
+      - id: fingerprint_wp
+        name: Fingerprint WordPress
+        description: Identify version, installed plugins, and themes
+        type: ai
+        task_type: reasoning
+        prompt_template: "Fingerprint WordPress at {{ target }}. Check: /wp-json/, generator meta tag, readme.html, /wp-content/plugins/ listing, /wp-content/themes/ listing, plugin version disclosure in CSS/JS paths, and user enumeration via REST API"
+        estimated_time_minutes: 15
+        priority: critical
+        completion_criteria:
+          - WP version identified
+          - Plugin inventory started
+
+  - id: plugin_analysis
+    name: Plugin Vulnerability Analysis
+    description: Identify vulnerable plugins and misconfigurations
+    steps:
+      - id: analyze_plugins
+        name: Analyze Plugin Vulnerabilities
+        description: Check known CVEs and vulnerabilities in detected plugins
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze WordPress plugins at {{ target }} for known vulnerabilities. Cross-reference detected plugin versions with public CVE databases. Identify: outdated plugins, vulnerable plugin versions, and plugin-specific attack vectors"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - Plugin vulnerabilities documented
+
+  - id: wp_admin
+    name: Admin Panel Analysis
+    description: Analyze WordPress admin panel security
+    steps:
+      - id: analyze_admin
+        name: Analyze WP Admin
+        description: Check login security, user roles, and hardening
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze WordPress admin security at {{ target }}. Check: /wp-admin access, login bruteforce protection, XML-RPC enabled, user role permission issues, debug.log exposure, wp-config.php backup exposure, and secret keys configuration"
+        estimated_time_minutes: 15
+        priority: high

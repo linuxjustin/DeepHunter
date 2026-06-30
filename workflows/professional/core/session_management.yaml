@@ -1,0 +1,67 @@
+name: session_management
+description: Session management review — token handling, cookie security, session lifecycle
+version: "2.0"
+tags:
+  - core
+  - session
+  - owasp
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: auth_method
+    type: string
+    default: session_cookie
+
+phases:
+  - id: cookie_analysis
+    name: Cookie Security Analysis
+    description: Analyze cookie configuration and security attributes
+    methodology_packs:
+      - session
+    knowledge_packs:
+      - session
+    steps:
+      - id: analyze_cookies
+        name: Analyze Cookie Security
+        description: Check Secure, HttpOnly, SameSite flags and cookie scope
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze cookie security for {{ target }}. Check: Secure flag, HttpOnly flag, SameSite attribute, Domain and Path scoping, Expiration/Max-Age, cookie prefix __Secure- and __Host-, and any cookie manipulation vulnerabilities"
+        estimated_time_minutes: 10
+        priority: critical
+        completion_criteria:
+          - Cookie security analyzed
+          - Missing flags documented
+
+  - id: session_fixation
+    name: Session Fixation Testing
+    description: Test for session fixation vulnerabilities
+    steps:
+      - id: test_fixation
+        name: Test Session Fixation
+        description: Verify session tokens are regenerated after login
+        type: ai
+        task_type: reasoning
+        prompt_template: "Test session fixation for {{ target }}. Verify: token regeneration on login, token regeneration on privilege escalation, URL-based session tokens, and token acceptance from query parameters"
+        estimated_time_minutes: 15
+        priority: high
+        completion_criteria:
+          - Fixation test complete
+          - Token regeneration verified
+
+  - id: concurrent_session
+    name: Concurrent Session Handling
+    description: Analyze concurrent session behavior
+    steps:
+      - id: test_concurrent
+        name: Test Concurrent Sessions
+        description: Evaluate how the application handles multiple sessions
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze concurrent session handling for {{ target }}. Check: multiple simultaneous sessions, session timeout behavior, idle timeout vs absolute timeout, logout invalidation across sessions, and remember-me functionality"
+        estimated_time_minutes: 10
+        priority: medium
+        completion_criteria:
+          - Concurrent session behavior documented

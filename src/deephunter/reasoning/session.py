@@ -39,13 +39,13 @@ from deephunter.reasoning.models import (
     ExperimentStatus,
     Finding,
     FindingSeverity,
+    Hypothesis,
     HypothesisStatus,
     Investigation,
     InvestigationState,
     Observation,
     Pivot,
     PivotReason,
-    TechnologyFingerprint,
 )
 from deephunter.utils.logging import get_logger
 
@@ -231,36 +231,6 @@ class InvestigationSession:
 
     # ── Hypothesis management ─────────────────────────────────────
 
-    def _add_hypothesis_to_state(
-        self,
-        title: str,
-        description: str,
-        bug_classes: list[str],
-        technologies: list[str],
-        rationale: str,
-        observation_ids: list[str],
-        evidence_ids: list[str],
-    ) -> dict:
-        hyp = {
-            "id": f"hyp-{__import__('uuid').uuid4().hex[:12]}",
-            "title": title,
-            "description": description,
-            "bug_classes": bug_classes,
-            "technologies": technologies,
-            "observation_ids": observation_ids,
-            "evidence_ids": evidence_ids,
-            "experiment_ids": [],
-            "finding_id": None,
-            "confidence": 0.0,
-            "status": HypothesisStatus.PROPOSED.value,
-            "rationale": rationale,
-            "created_at": datetime.now(UTC).isoformat(),
-            "updated_at": datetime.now(UTC).isoformat(),
-        }
-        self._inv.state.hypotheses.append(hyp)
-        self._inv.updated_at = datetime.now(UTC)
-        return hyp
-
     def create_hypothesis(
         self,
         title: str,
@@ -270,7 +240,7 @@ class InvestigationSession:
         rationale: str = "",
         observation_ids: list[str] | None = None,
         evidence_ids: list[str] | None = None,
-    ) -> dict:
+    ) -> Hypothesis:
         """Create a hypothesis and wire it to supporting observations.
 
         Args:
@@ -283,21 +253,28 @@ class InvestigationSession:
             evidence_ids: Evidence supporting those observations.
 
         Returns:
-            The hypothesis dict (stored in state).
+            The created Hypothesis.
         """
-        hyp = self._add_hypothesis_to_state(
+        from deephunter.core.types import BugClass
+
+        bc_list: list[BugClass] = []
+        for bc_str in (bug_classes or []):
+            try:
+                bc_list.append(BugClass(bc_str))
+            except ValueError:
+                pass
+
+        hyp = Hypothesis(
             title=title,
             description=description,
-            bug_classes=bug_classes or [],
+            bug_classes=bc_list,
             technologies=technologies or [],
             rationale=rationale,
             observation_ids=observation_ids or [],
             evidence_ids=evidence_ids or [],
         )
-
-        for obs_id in hyp["observation_ids"]:
-            if self._graph.has_node(obs_id) and self._graph.has_node(hyp["id"]):
-                self._graph.add_edge(obs_id, hyp["id"], EdgeType.SUGGESTS)
+        self._inv.state.hypotheses.append(hyp)
+        self._inv.updated_at = datetime.now(UTC)
 
         self._event_bus.emit(
             HypothesisCreatedEvent(
@@ -328,33 +305,33 @@ class InvestigationSession:
         if hyp is None:
             raise ValueError(f"Hypothesis not found: {hypothesis_id}")
 
-        old_conf = hyp.get("confidence", 0.0)
+        old_conf = hyp.confidence
 
         obs = [
             o for o in self.state.observations
-            if o.id in hyp.get("observation_ids", [])
+            if o.id in hyp.observation_ids
         ]
         ev = [
             e for e in self.state.evidence
-            if e.id in hyp.get("evidence_ids", [])
+            if e.id in hyp.evidence_ids
         ]
         exps = experiments or [
             e for e in self.state.experiments
-            if e.id in hyp.get("experiment_ids", [])
+            if e.id in hyp.experiment_ids
         ]
 
         new_conf = self._scorer.score(obs, ev, exps)
-        hyp["confidence"] = new_conf
-        hyp["updated_at"] = datetime.now(UTC).isoformat()
+        hyp.confidence = new_conf
+        hyp.updated_at = datetime.now(UTC)
 
         new_status = self._status_scorer.determine_status(new_conf, exps)
-        old_status = hyp.get("status", HypothesisStatus.PROPOSED.value)
-        if new_status.value != old_status:
-            hyp["status"] = new_status.value
+        old_status = hyp.status
+        if new_status != old_status:
+            hyp.status = new_status
             self._event_bus.emit(
                 HypothesisStatusChangedEvent(
                     hypothesis_id=hypothesis_id,
-                    old_status=old_status,
+                    old_status=old_status.value,
                     new_status=new_status.value,
                     investigation_id=self._inv.id,
                 )
@@ -362,10 +339,10 @@ class InvestigationSession:
 
         self._event_bus.emit(
             HypothesisUpdatedEvent(
-                hypothesis_title=hyp["title"],
+                hypothesis_title=hyp.title,
                 old_confidence=old_conf,
                 new_confidence=new_conf,
-                new_status=hyp["status"],
+                new_status=hyp.status.value,
                 investigation_id=self._inv.id,
             )
         )
@@ -579,15 +556,15 @@ class InvestigationSession:
             cwe_ids=cwe_ids or [],
             hypothesis_id=hypothesis_id,
             experiment_ids=experiment_ids or [],
-            evidence_ids=hyp.get("evidence_ids", []),
+            evidence_ids=hyp.evidence_ids,
         )
         self.state.findings.append(finding)
         self._graph.add_node(finding)
         if self._graph.has_node(hypothesis_id):
             self._graph.add_edge(hypothesis_id, finding.id, EdgeType.CONFIRMS)
 
-        hyp["finding_id"] = finding.id
-        hyp["status"] = HypothesisStatus.CONFIRMED.value
+        hyp.finding_id = finding.id
+        hyp.status = HypothesisStatus.CONFIRMED
 
         self._event_bus.emit(
             FindingCreatedEvent(
@@ -695,9 +672,9 @@ class InvestigationSession:
 
     # ── Internal helpers ──────────────────────────────────────────
 
-    def _find_hypothesis(self, hyp_id: str) -> dict | None:
+    def _find_hypothesis(self, hyp_id: str) -> Hypothesis | None:
         for hyp in self._inv.state.hypotheses:
-            if hyp["id"] == hyp_id:
+            if hyp.id == hyp_id:
                 return hyp
         return None
 

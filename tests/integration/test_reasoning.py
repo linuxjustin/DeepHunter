@@ -4,13 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from deephunter.core.types import BugClass, Confidence
+from deephunter.core.types import BugClass, Technology
 from deephunter.rag.retriever import Retriever
-from deephunter.reasoning.hypothesis import (
-    Hypothesis,
-    HypothesisGenerator,
-    HypothesisPriority,
-)
+from deephunter.reasoning.hypothesis import HypothesisGenerator
+from deephunter.reasoning.models import Hypothesis, HypothesisPriority
 
 
 class TestHypothesis:
@@ -22,7 +19,7 @@ class TestHypothesis:
         )
         assert hyp.id.startswith("hyp-")
         assert hyp.priority == HypothesisPriority.MEDIUM
-        assert hyp.confidence == Confidence.UNKNOWN
+        assert hyp.confidence == 0.0
 
     def test_high_priority(self) -> None:
         hyp = Hypothesis(
@@ -40,7 +37,7 @@ class TestHypothesis:
         d = hyp.to_dict()
         assert d["title"] == "Test"
         assert d["bug_classes"] == ["xss"]
-        assert "created" in d
+        assert "created_at" in d
 
 
 class TestHypothesisGenerator:
@@ -62,17 +59,23 @@ class TestHypothesisGenerator:
             gen.generate("test")
 
     def test_confidence_from_count(self) -> None:
-        assert HypothesisGenerator._confidence_from_count(5) == Confidence.HIGH
-        assert HypothesisGenerator._confidence_from_count(3) == Confidence.MEDIUM
-        assert HypothesisGenerator._confidence_from_count(1) == Confidence.LOW
-        assert HypothesisGenerator._confidence_from_count(0) == Confidence.LOW
+        from deephunter.core.types import Confidence as C
+
+        gen = HypothesisGenerator.__new__(HypothesisGenerator)
+        assert gen._confidence_from_count(5) == C.HIGH
+        assert gen._confidence_from_count(3) == C.MEDIUM
+        assert gen._confidence_from_count(1) == C.LOW
+        assert gen._confidence_from_count(0) == C.LOW
 
     def test_priority_from_confidence(self) -> None:
+        from deephunter.core.types import Confidence as C
+
         mapping = [
-            (Confidence.HIGH, HypothesisPriority.CRITICAL),
-            (Confidence.MEDIUM, HypothesisPriority.HIGH),
-            (Confidence.LOW, HypothesisPriority.MEDIUM),
-            (Confidence.UNKNOWN, HypothesisPriority.LOW),
+            (C.HIGH, HypothesisPriority.CRITICAL),
+            (C.MEDIUM, HypothesisPriority.HIGH),
+            (C.LOW, HypothesisPriority.MEDIUM),
+            (C.UNKNOWN, HypothesisPriority.LOW),
         ]
+        gen = HypothesisGenerator.__new__(HypothesisGenerator)
         for conf, expected in mapping:
-            assert HypothesisGenerator._priority_from_confidence(conf) == expected
+            assert gen._priority_from_confidence(conf) == expected

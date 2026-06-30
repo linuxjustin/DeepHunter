@@ -1,0 +1,69 @@
+name: authorization_review
+description: Authorization review — IDOR, privilege escalation, role-based access control
+version: "2.0"
+tags:
+  - core
+  - authorization
+  - owasp
+
+variables:
+  - name: target
+    type: string
+    required: true
+  - name: auth_method
+    type: string
+
+phases:
+  - id: idor_testing
+    name: IDOR Testing
+    description: Test for insecure direct object references across all endpoints
+    methodology_packs:
+      - authorization
+    knowledge_packs:
+      - authorization
+    planner_rules:
+      - AuthorizationRule
+    checkpoints:
+      - idor_tested
+    steps:
+      - id: map_resource_endpoints
+        name: Map Resource Endpoints
+        description: Identify all endpoints that access resources by ID
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze {{ target }} for potential IDOR vulnerabilities. Identify all endpoints that use user-supplied identifiers (IDs, UUIDs, emails) to access resources. List each endpoint and the parameter used"
+        estimated_time_minutes: 15
+        priority: critical
+        expected_outputs:
+          - IDOR candidate endpoints
+          - Parameter identification
+        completion_criteria:
+          - All resource endpoints mapped
+          - IDOR candidates documented
+
+  - id: privilege_escalation
+    name: Privilege Escalation
+    description: Test for horizontal and vertical privilege escalation
+    steps:
+      - id: test_horizontal
+        name: Test Horizontal Privilege Escalation
+        description: Test accessing other users' resources
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze {{ target }} for horizontal privilege escalation. Check for: user ID enumeration in URLs, predictable resource IDs, mass assignment vulnerabilities, and API endpoint access controls"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - Horizontal escalation tested
+          - Vulnerabilities documented
+      - id: test_vertical
+        name: Test Vertical Privilege Escalation
+        description: Test accessing admin/higher-privilege functionality
+        type: ai
+        task_type: reasoning
+        prompt_template: "Analyze {{ target }} for vertical privilege escalation. Check for: admin parameter discovery, forced browsing, API privilege checks, role switching, and HTTP method tampering"
+        estimated_time_minutes: 20
+        priority: critical
+        completion_criteria:
+          - Vertical escalation tested
+          - Admin endpoints discovered
