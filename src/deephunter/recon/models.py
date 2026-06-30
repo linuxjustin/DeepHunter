@@ -233,6 +233,9 @@ class GraphNodeType(str, Enum):
     AUTH_METHOD = "auth_method"
     CLOUD_RESOURCE = "cloud_resource"
     JS_ENDPOINT = "js_endpoint"
+    JS_BUNDLE = "js_bundle"
+    JS_MODULE = "js_module"
+    JS_ROUTE = "js_route"
     API_ENDPOINT = "api_endpoint"
     DNS_RECORD = "dns_record"
     CERTIFICATE = "certificate"
@@ -259,6 +262,10 @@ class GraphEdgeType(str, Enum):
     SUBDOMAIN_OF = "subdomain_of"
     HAS_DNS_RECORD = "has_dns_record"
     OBSERVED_AT = "observed_at"
+    IMPORTS = "imports"
+    CONTAINS = "contains"
+    DEFINES_ROUTE = "defines_route"
+    HAS_JS_FILE = "has_js_file"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
