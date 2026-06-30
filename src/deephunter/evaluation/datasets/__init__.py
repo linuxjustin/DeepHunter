@@ -1,0 +1,25 @@
+"""Built-in benchmark datasets for the Evaluation Framework."""
+
+from deephunter.evaluation.datasets.golden import (
+    GOLDEN_DATASET_SQLI_XSS,
+    GOLDEN_DATASET_AUTH,
+    GOLDEN_DATASET_SSRF,
+    GOLDEN_DATASET_LARAVEL,
+    GOLDEN_DATASET_CLOUD,
+)
+from deephunter.evaluation.datasets.regression import (
+    REGRESSION_DATASET_PLANNER,
+    REGRESSION_DATASET_METHODOLOGY,
+    REGRESSION_DATASET_TECH_INTEL,
+)
+
+__all__ = [
+    "GOLDEN_DATASET_SQLI_XSS",
+    "GOLDEN_DATASET_AUTH",
+    "GOLDEN_DATASET_SSRF",
+    "GOLDEN_DATASET_LARAVEL",
+    "GOLDEN_DATASET_CLOUD",
+    "REGRESSION_DATASET_PLANNER",
+    "REGRESSION_DATASET_METHODOLOGY",
+    "REGRESSION_DATASET_TECH_INTEL",
+]
