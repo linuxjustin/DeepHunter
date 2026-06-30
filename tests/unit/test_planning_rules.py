@@ -126,7 +126,7 @@ class TestRuleRegistry:
 
     def test_with_default_rules(self) -> None:
         reg = RuleRegistry.with_default_rules()
-        assert len(reg.list_rules()) == 13
+        assert len(reg.list_rules()) == 14
 
 
 class TestReconRule:

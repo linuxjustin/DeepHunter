@@ -1,0 +1,158 @@
+"""Next.js Expert Methodology Pack."""
+
+from deephunter.core.types import BugClass
+from deephunter.methodology.packs.base import (
+    DecisionTreeBranch,
+    DecisionTreeNode,
+    InvestigationGoal,
+    MethodologyPack,
+    PackCategory,
+    PackChecklist,
+    PackFrameworkProfile,
+    PackPlannerRule,
+)
+
+PACK = MethodologyPack(
+    name="Next.js",
+    version="1.0.0",
+    category=PackCategory.FRAMEWORK,
+    description="Expert methodology for testing Next.js applications. Covers server actions, middleware bypass, SSRF via image optimization, source map exposure, API route security, and Server Components.",
+    supported_technologies=["Next.js", "React", "Node.js"],
+    supported_frameworks=["Next.js"],
+    supported_languages=["JavaScript", "TypeScript"],
+    attack_surface_areas=["authentication", "authorization", "api", "ssrf", "middleware", "server components", "image optimization", "source maps"],
+    investigation_priority=85,
+    related_packs=["REST API", "JWT", "OAuth", "Session Management", "Microservices"],
+
+    profile=PackFrameworkProfile(
+        architecture_description="React full-stack framework with App Router / Pages Router, Server Components, API routes, Middleware (Edge), Static Generation (SSG), Server-Side Rendering (SSR), and Incremental Static Regeneration (ISR).",
+        authentication_components=["NextAuth.js / Auth.js", "Clerk", "Supabase Auth", "Lucia", "Custom JWT in cookies/localStorage", "Middleware matcher for route protection"],
+        middleware="Edge-based middleware.ts/config, runs before request, matcher pattern for route filtering, can redirect/rewrite",
+        api_layer="Route handlers (route.ts) in App Router, API routes (pages/api) in Pages Router, support for GET/POST/PUT/PATCH/DELETE",
+        trust_boundaries=["Server vs Client Component boundary", "Middleware edge function boundary", "API route boundary", "getServerSideProps data flow", "Server Action boundary"],
+        investigation_areas=[
+            "Server Action CSRF (no built-in CSRF protection)",
+            "Middleware bypass via path manipulation",
+            "_next/image SSRF (unvalidated image URLs)",
+            "Source maps exposed in _next/static/chunks/*.map",
+            "API route RCE via dynamic imports or eval",
+            "getServerSideProps data leakage",
+            "Edge function env variable leakage",
+            "XSS in Server Components",
+            "ISR stale cache access",
+        ],
+    ),
+
+    workflow=[
+        "Next.js Identified",
+        "Architecture Review (App vs Pages Router)",
+        "Source Map Analysis",
+        "Middleware Configuration Review",
+        "Server Action Analysis",
+        "API Route Security Review",
+        "Image Optimization SSRF Testing",
+        "Authentication Flow Review",
+        "Server/Client Component Data Flow",
+        "Evidence Collection",
+    ],
+
+    checklists=[
+        PackChecklist(
+            objective="Extract source maps for source code disclosure",
+            description="Download and analyze Next.js source maps from _next/static/chunks/ to recover application source code.",
+            procedure="1. Check /_next/static/chunks/pages/ for .js files\n2. Look for .map files alongside .js files\n3. Download all .map files found\n4. Use source-map library to reconstruct original source\n5. Search for API keys, secrets, internal endpoints",
+            priority="critical", difficulty="easy",
+            required_evidence=["Source maps accessible", "Source code with secrets/endpoints recovered"],
+            expected_result="Source code exposure assessed",
+            bug_classes=[BugClass.INFO_DISCLOSURE],
+            tags=["nextjs", "source maps", "recon"],
+        ),
+        PackChecklist(
+            objective="Test _next/image SSRF",
+            description="Test the Next.js Image Optimization API for Server-Side Request Forgery via unvalidated image URLs.",
+            procedure="1. Identify /_next/image endpoint with url parameter\n2. Test url=https://internal-service/admin\n3. Test url=file:///etc/passwd\n4. Test url=https://[attacker-controlled]/callback\n5. Check for cloud metadata endpoint access\n6. Test protocol-relative URLs (//attacker.com/x)",
+            priority="critical", difficulty="medium",
+            required_evidence=["Internal response data", "External callback received"],
+            expected_result="SSRF confirmed or ruled out",
+            bug_classes=[BugClass.SSRF],
+            tags=["nextjs", "ssrf", "image optimization"],
+        ),
+        PackChecklist(
+            objective="Test Server Action CSRF",
+            description="Test Next.js Server Actions (form mutations) for CSRF vulnerabilities since they lack built-in CSRF protection.",
+            procedure="1. Identify server actions (form action, useActionState, revalidateTag)\n2. Craft cross-origin form POST to trigger server action\n3. Test if Origin/Referer headers are validated\n4. Test with no cookies (if action modifies state without cookies)\n5. Test with custom Origin header",
+            priority="critical", difficulty="medium",
+            required_evidence=["Server action executed cross-origin"],
+            expected_result="CSRF on server actions confirmed or ruled out",
+            bug_classes=[BugClass.CSRF],
+            tags=["nextjs", "server actions", "csrf"],
+        ),
+        PackChecklist(
+            objective="Test middleware bypass",
+            description="Test Next.js Edge Middleware for path bypasses that allow access to protected routes without authentication.",
+            procedure="1. Identify middleware.ts matcher configuration\n2. Test path traversal in URL (//protected, /%2e%2e/protected)\n3. Test URL encoding bypass (/pr%6ftected)\n4. Test with different HTTP methods (if matched only on GET)\n5. Test with custom headers that change routing\n6. Check for race conditions in middleware execution",
+            priority="critical", difficulty="hard",
+            required_evidence=["Protected route accessible without auth"],
+            expected_result="Middleware bypass confirmed or ruled out",
+            bug_classes=[BugClass.AUTH_BYPASS],
+            tags=["nextjs", "middleware", "edge"],
+        ),
+        PackChecklist(
+            objective="Review API route security",
+            description="Test Next.js API routes for injection, auth bypass, and data exposure.",
+            procedure="1. Enumerate all API routes (page/api/* or app/api/*)\n2. Identify routes without authentication checks\n3. Test for SQL/NoSQL injection in API handlers\n4. Test for parameter pollution in query/body\n5. Check for sensitive data in API responses\n6. Test for path traversal in route parameters",
+            priority="high", difficulty="medium",
+            required_evidence=["API route accessible without proper auth", "Injection proof"],
+            expected_result="API route security assessed",
+            bug_classes=[BugClass.AUTH_BYPASS, BugClass.SQL_INJECTION],
+            tags=["nextjs", "api", "route handler"],
+        ),
+        PackChecklist(
+            objective="Test getServerSideProps data leakage",
+            description="Test if SSR data fetching exposes internal data to the client through hydration.",
+            procedure="1. Identify pages using getServerSideProps\n2. Check the __NEXT_DATA__ script tag in page source\n3. Compare server-side props with what client needs\n4. Look for API keys, tokens, internal IDs in __NEXT_DATA__\n5. Check for database queries exposing sensitive data",
+            priority="high", difficulty="easy",
+            required_evidence=["Sensitive data in __NEXT_DATA__ page source"],
+            expected_result="Data leakage via SSR props assessed",
+            bug_classes=[BugClass.INFO_DISCLOSURE],
+            tags=["nextjs", "ssr", "data leakage"],
+        ),
+        PackChecklist(
+            objective="Test ISR stale cache access",
+            description="Test Incremental Static Regeneration for serving stale or unauthorized cached content after updates.",
+            procedure="1. Identify pages using ISR (revalidate property)\n2. Access page before revalidation completes\n3. Compare content before and after revalidation\n4. Test if authenticated content is cached and served to unauthenticated users\n5. Check cache invalidation behavior",
+            priority="medium", difficulty="medium",
+            required_evidence=["Stale cache content served"],
+            expected_result="ISR cache security assessed",
+            bug_classes=[BugClass.INFO_DISCLOSURE, BugClass.BUSINESS_LOGIC],
+            tags=["nextjs", "isr", "cache"],
+        ),
+    ],
+
+    decision_trees=[
+        DecisionTreeNode(
+            id="nextjs-root",
+            question="What Next.js feature to investigate?",
+            branches=[
+                DecisionTreeBranch(condition="Source maps accessible", conclusion="CRITICAL: Download all .map files, reconstruct source code, search for secrets/keys/internal endpoints"),
+                DecisionTreeBranch(condition="Image optimization endpoint", conclusion="TEST SSRF: /_next/image with url=file://, http://internal, http://metadata"),
+                DecisionTreeBranch(condition="Server Actions present", conclusion="TEST CSRF: Cross-origin form submission, Origin header validation, state modification"),
+                DecisionTreeBranch(condition="Middleware present", conclusion="TEST BYPASS: Path encoding, method override, URL normalization tricks"),
+            ],
+        ),
+    ],
+
+    planner_rules=[
+        PackPlannerRule(technology="Next.js", description="Prioritize source map analysis for Next.js apps", priority_modifier=0.20, phase="recon"),
+        PackPlannerRule(technology="Next.js", description="Prioritize _next/image SSRF testing", priority_modifier=0.15, phase="input_validation"),
+        PackPlannerRule(technology="Next.js", description="Prioritize Server Action CSRF testing", priority_modifier=0.15, phase="input_validation"),
+        PackPlannerRule(technology="Next.js", description="Prioritize middleware bypass testing", priority_modifier=0.15, phase="authentication_analysis"),
+    ],
+
+    references=[
+        {"source": "CWE", "id": "CWE-918", "title": "SSRF"},
+        {"source": "CWE", "id": "CWE-352", "title": "CSRF"},
+        {"source": "OWASP", "id": "API", "title": "OWASP API Security Top 10"},
+    ],
+    tags=["nextjs", "react", "typescript", "vercel", "web"],
+)

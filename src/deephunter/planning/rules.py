@@ -112,6 +112,9 @@ class RuleRegistry:
         registry = cls()
         for rule_cls in _BUILTIN_RULES:
             registry.register(rule_cls())
+        # Register MethodologyPackRule separately to avoid circular import
+        from deephunter.methodology.packs.integration import MethodologyPackRule  # noqa: E402
+        registry.register(MethodologyPackRule())
         return registry
 
 
@@ -570,3 +573,6 @@ _BUILTIN_RULES: list[type[PlanningRule]] = [
     PrivilegeEscalationRule,
     ReportPreparationRule,
 ]
+
+
+
