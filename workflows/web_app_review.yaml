@@ -1,0 +1,134 @@
+name: Web Application Security Review
+description: Standard workflow for web application security investigation
+version: "1.0"
+tags:
+  - web
+  - owasp
+  - full_review
+
+steps:
+  - id: load_scope
+    name: Load Scope
+    description: Load target scope definition
+    type: builtin
+    action: load_scope
+    config:
+      in_scope:
+        - "https://example.com"
+
+  - id: import_recon
+    name: Import Recon
+    description: Import reconnaissance data for in-scope assets
+    type: builtin
+    action: import_recon
+    depends_on:
+      - load_scope
+
+  - id: normalize_recon
+    name: Normalize Recon
+    description: Normalize and deduplicate recon data
+    type: builtin
+    action: normalize_recon
+    depends_on:
+      - import_recon
+
+  - id: build_graph
+    name: Build Attack Surface Graph
+    description: Build the attack surface graph from recon data
+    type: builtin
+    action: build_attack_surface_graph
+    depends_on:
+      - normalize_recon
+
+  - id: identify_technologies
+    name: Identify Technologies
+    description: Identify technologies from the attack surface
+    type: builtin
+    action: identify_technologies
+    depends_on:
+      - build_graph
+
+  - id: select_knowledge_packs
+    name: Select Knowledge Packs
+    description: Select knowledge packs based on identified technologies
+    type: builtin
+    action: select_knowledge_packs
+    depends_on:
+      - identify_technologies
+
+  - id: select_methodology
+    name: Select Methodology
+    description: Select methodology packs for relevant bug classes
+    type: builtin
+    action: select_methodology
+    depends_on:
+      - identify_technologies
+
+  - id: generate_plan
+    name: Generate Investigation Plan
+    description: Generate an investigation plan using the Planner
+    type: builtin
+    action: generate_plan
+    depends_on:
+      - select_knowledge_packs
+      - select_methodology
+
+  - id: ai_analysis
+    name: AI-Assisted Analysis
+    description: Use AI to analyze the target and suggest attack paths
+    type: ai
+    task_type: reasoning
+    prompt_template: "Analyze the attack surface of {target} and identify the most promising bug classes to investigate based on the technologies identified."
+    depends_on:
+      - build_graph
+
+  - id: manual_approval
+    name: Manual Approval
+    description: Researcher approves proceeding with active testing
+    type: approval
+    approval_message: "Review the AI analysis and approve proceeding with active testing."
+    depends_on:
+      - ai_analysis
+
+  - id: execute_tasks
+    name: Execute Investigation Tasks
+    description: Run the investigation tasks from the generated plan
+    type: builtin
+    action: build_context
+    depends_on:
+      - generate_plan
+      - manual_approval
+
+  - id: collect_evidence
+    name: Collect Evidence
+    description: Collect and store structured evidence
+    type: builtin
+    action: collect_evidence
+    depends_on:
+      - execute_tasks
+
+  - id: draft_report
+    name: Draft Report
+    description: Draft the final investigation report
+    type: builtin
+    action: draft_report
+    depends_on:
+      - collect_evidence
+
+  - id: review_findings
+    name: Review Findings
+    description: Review and triage draft findings
+    type: builtin
+    action: review_findings
+    depends_on:
+      - draft_report
+
+  - id: export_report
+    name: Export Report
+    description: Export the investigation report to markdown
+    type: builtin
+    action: export_report
+    config:
+      path: "report_output.md"
+    depends_on:
+      - review_findings

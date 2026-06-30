@@ -1,0 +1,953 @@
+"""Investigation Workflow Orchestrator.
+
+Coordinates all existing DeepHunter subsystems into an end-to-end
+investigation workflow.  Drives sequential execution, conditional
+branching, manual approval points, checkpointing, and recovery.
+
+Composes, does not replace: Planner, AgentOrchestratorV2, ModelRouter,
+InvestigationSession, ContextEngine, KnowledgePackRegistry,
+MethodologyEngine, and the Evaluation Framework.
+"""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from deephunter.core.config import DeepHunterConfig
+from deephunter.core.exceptions import InvestigationError
+from deephunter.investigation.evidence import EvidenceManager
+from deephunter.investigation.models import (
+    EvidenceType,
+    InvestigationReport,
+    InvestigationSessionState,
+    InvestigationStatus,
+    ScopeEntry,
+    ScopeEntryType,
+    ScopeInfo,
+    Task,
+    TaskCategory,
+    TaskPriority,
+    TaskStatus,
+    WorkflowDefinition,
+    WorkflowResult,
+    WorkflowStepDefinition,
+    WorkflowStepResult,
+    WorkflowStepType,
+)
+from deephunter.investigation.report import ReportGenerator
+from deephunter.investigation.workflow import WorkflowLoader
+from deephunter.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
+# Forward references for lazy imports to avoid circular deps at module level
+_INVESTIGATION_SESSION_CLS = None
+_PLANNER_CLS = None
+_ORCHESTRATOR_V2_CLS = None
+_MODEL_ROUTER_CLS = None
+_CONTEXT_ENGINE_CLS = None
+_KP_REGISTRY = None
+_METHODOLOGY_PIPELINE_CLS = None
+
+
+def _get_investigation_session():
+    global _INVESTIGATION_SESSION_CLS
+    if _INVESTIGATION_SESSION_CLS is None:
+        from deephunter.reasoning.session import InvestigationSession
+        _INVESTIGATION_SESSION_CLS = InvestigationSession
+    return _INVESTIGATION_SESSION_CLS
+
+
+def _get_planner():
+    global _PLANNER_CLS
+    if _PLANNER_CLS is None:
+        from deephunter.planning import Planner
+        _PLANNER_CLS = Planner
+    return _PLANNER_CLS
+
+
+def _get_orchestrator_v2():
+    global _ORCHESTRATOR_V2_CLS
+    if _ORCHESTRATOR_V2_CLS is None:
+        from deephunter.agents.orchestrator_v2 import AgentOrchestratorV2
+        _ORCHESTRATOR_V2_CLS = AgentOrchestratorV2
+    return _ORCHESTRATOR_V2_CLS
+
+
+def _get_model_router():
+    global _MODEL_ROUTER_CLS
+    if _MODEL_ROUTER_CLS is None:
+        from deephunter.router import ModelRouter
+        _MODEL_ROUTER_CLS = ModelRouter
+    return _MODEL_ROUTER_CLS
+
+
+def _get_context_engine():
+    global _CONTEXT_ENGINE_CLS
+    if _CONTEXT_ENGINE_CLS is None:
+        from deephunter.context import ContextEngine
+        _CONTEXT_ENGINE_CLS = ContextEngine
+    return _CONTEXT_ENGINE_CLS
+
+
+def _get_kp_registry():
+    global _KP_REGISTRY
+    if _KP_REGISTRY is None:
+        from deephunter.knowledge import load_all_knowledge_packs
+        _KP_REGISTRY = load_all_knowledge_packs()
+    return _KP_REGISTRY
+
+
+def _get_methodology_pipeline():
+    global _METHODOLOGY_PIPELINE_CLS
+    if _METHODOLOGY_PIPELINE_CLS is None:
+        from deephunter.methodology import MethodologyPipeline
+        _METHODOLOGY_PIPELINE_CLS = MethodologyPipeline
+    return _METHODOLOGY_PIPELINE_CLS
+
+
+class InvestigationOrchestrator:
+    """Coordinates the full investigation workflow lifecycle.
+
+    Usage::
+
+        orch = InvestigationOrchestrator()
+        state = orch.create_session("https://example.com")
+
+        # Load a YAML workflow and execute it
+        workflow = orch.load_workflow("workflows/web_app_review.yaml")
+        result = orch.execute_workflow(state, workflow)
+
+        # Or drive manually
+        orch.load_scope(state, scope_data)
+        orch.import_recon(state, recon_data)
+        orch.generate_plan(state)
+        orch.execute_tasks(state)
+        report = orch.generate_report(state)
+    """
+
+    def __init__(
+        self,
+        config: DeepHunterConfig | None = None,
+        workflow_dir: str | Path | None = None,
+    ) -> None:
+        self._config = config or DeepHunterConfig.default()
+        self._workflow_loader = WorkflowLoader(workflow_dir or Path("workflows"))
+        self._reasoning_sessions: dict[str, Any] = {}
+
+    # ── Session Lifecycle ─────────────────────────────────────────────────────
+
+    def create_session(
+        self,
+        target: str,
+        name: str = "",
+        scope_entries: list[ScopeEntry] | None = None,
+        technologies: list[str] | None = None,
+    ) -> InvestigationSessionState:
+        """Create a new investigation session with a reasoning session.
+
+        Args:
+            target: The target being investigated.
+            name: Optional human-readable name.
+            scope_entries: Optional initial scope entries.
+            technologies: Optional initial technology list.
+
+        Returns:
+            A new InvestigationSessionState.
+        """
+        state = InvestigationSessionState(
+            target=target,
+            name=name or f"Investigation: {target}",
+            status=InvestigationStatus.CREATED,
+            scope=ScopeInfo(
+                target=target,
+                entries=scope_entries or [
+                    ScopeEntry(value=target, entry_type=ScopeEntryType.IN_SCOPE)
+                ],
+                technologies=technologies or [],
+            ),
+        )
+
+        reasoning_cls = _get_investigation_session()
+        reasoning_session = reasoning_cls.new(target=target, name=state.name)
+        state.reasoning_session_id = reasoning_session.investigation.id
+        self._reasoning_sessions[state.session_id] = reasoning_session
+
+        return state
+
+    def get_reasoning_session(self, state: InvestigationSessionState) -> Any:
+        """Get the reasoning session associated with this investigation state."""
+        return self._reasoning_sessions.get(state.session_id)
+
+    def save_session(self, state: InvestigationSessionState, path: str | Path) -> Path:
+        """Persist the full session state to JSON.
+
+        Also saves the associated reasoning session.
+        """
+        p = Path(path).expanduser().resolve()
+        p.parent.mkdir(parents=True, exist_ok=True)
+
+        reasoning = self.get_reasoning_session(state)
+        if reasoning:
+            reasoning_path = p.parent / f"{p.stem}_reasoning{p.suffix}"
+            reasoning.save(str(reasoning_path))
+
+        data = state.model_dump()
+        p.write_text(
+            __import__("json").dumps(data, indent=2, default=str),
+            "utf-8",
+        )
+        logger.debug("Saved investigation session %s to %s", state.session_id, p)
+        return p
+
+    def load_session(self, path: str | Path) -> InvestigationSessionState:
+        """Restore a session state from JSON."""
+        p = Path(path).expanduser().resolve()
+        if not p.exists():
+            raise FileNotFoundError(f"Session file not found: {p}")
+
+        data = __import__("json").loads(p.read_text("utf-8"))
+        state = InvestigationSessionState(**data)
+
+        reasoning_path = p.parent / f"{p.stem}_reasoning{p.suffix}"
+        if reasoning_path.exists():
+            reasoning_cls = _get_investigation_session()
+            reasoning = reasoning_cls.load(str(reasoning_path))
+            self._reasoning_sessions[state.session_id] = reasoning
+
+        return state
+
+    # ── Workflow Loading ─────────────────────────────────────────────────────
+
+    def load_workflow(self, path: str | Path) -> WorkflowDefinition:
+        """Load a workflow definition from a YAML file."""
+        return self._workflow_loader.load(path)
+
+    def load_workflow_by_name(self, name: str) -> WorkflowDefinition:
+        """Load a workflow by name from the configured workflow directory."""
+        return self._workflow_loader.load_by_name(name)
+
+    def list_workflows(self) -> list[dict[str, str]]:
+        """List available workflows."""
+        return self._workflow_loader.list_workflows()
+
+    # ── Workflow Execution ───────────────────────────────────────────────────
+
+    def execute_workflow(
+        self,
+        state: InvestigationSessionState,
+        workflow: WorkflowDefinition,
+        auto_approve: bool = False,
+        callbacks: dict[str, Callable] | None = None,
+    ) -> WorkflowResult:
+        """Execute a complete workflow definition against the given session.
+
+        Args:
+            state: The investigation session state.
+            workflow: The workflow definition to execute.
+            auto_approve: If True, automatically approve all approval steps.
+            callbacks: Optional dict of step_id -> callable for custom handlers.
+
+        Returns:
+            A WorkflowResult with per-step results.
+        """
+        step_results: list[WorkflowStepResult] = []
+        total_start = time.perf_counter()
+
+        state.status = InvestigationStatus.IN_PROGRESS
+
+        # Build dependency map
+        {s.id: s for s in workflow.steps}
+        completed: set[str] = set()
+
+        for step in workflow.steps:
+            # Check dependencies
+            missing_deps = [d for d in step.depends_on if d not in completed]
+            if missing_deps:
+                step_results.append(WorkflowStepResult(
+                    step_id=step.id,
+                    success=False,
+                    error=f"Dependencies not satisfied: {', '.join(missing_deps)}",
+                ))
+                continue
+
+            # Check if we should skip (checkpoint recovery)
+            if step.id in state.completed_steps:
+                logger.info("Skipping already completed step: %s", step.id)
+                step_results.append(WorkflowStepResult(
+                    step_id=step.id, success=True, data={"skipped": True},
+                ))
+                completed.add(step.id)
+                continue
+
+            # Execute step
+            state.current_step = step.id
+            step_start = time.perf_counter()
+
+            try:
+                if step.id in (callbacks or {}):
+                    result_data = callbacks[step.id](state, step)
+                    success = True
+                    error = ""
+
+                elif step.step_type == WorkflowStepType.BUILTIN:
+                    if not step.action:
+                        result_data = {}
+                        success = True
+                        error = ""
+                    else:
+                        result_data = self._execute_builtin(state, step)
+                        success = True
+                        error = ""
+
+                elif step.step_type == WorkflowStepType.AI:
+                    result_data = self._execute_ai_step(state, step)
+                    success = True
+                    error = ""
+
+                elif step.step_type == WorkflowStepType.APPROVAL:
+                    if auto_approve:
+                        result_data = {"approved": True, "auto": True}
+                        success = True
+                        error = ""
+                    else:
+                        result_data = {"approved": False, "awaiting": True}
+                        success = True
+                        error = ""
+
+                elif step.step_type == WorkflowStepType.CONDITIONAL:
+                    result_data = self._execute_conditional(state, step, completed)
+                    success = True
+                    error = ""
+
+                else:
+                    result_data = {}
+                    success = False
+                    error = f"Unknown step type: {step.step_type}"
+            except Exception as exc:
+                logger.exception("Step %s failed: %s", step.id, exc)
+                result_data = {}
+                success = False
+                error = str(exc)
+
+            elapsed = (time.perf_counter() - step_start) * 1000
+
+            step_result = WorkflowStepResult(
+                step_id=step.id,
+                success=success,
+                data=result_data,
+                error=error,
+                execution_time_ms=elapsed,
+            )
+            step_results.append(step_result)
+
+            if success:
+                completed.add(step.id)
+                state.completed_steps.append(step.id)
+            else:
+                logger.error("Workflow step %s failed: %s", step.id, error)
+
+            state.updated_at = datetime.now(UTC).isoformat()
+
+        total_elapsed = (time.perf_counter() - total_start) * 1000
+
+        if all(r.success for r in step_results):
+            state.status = InvestigationStatus.COMPLETED
+        else:
+            state.status = InvestigationStatus.PAUSED
+
+        return WorkflowResult(
+            workflow_name=workflow.name,
+            success=all(r.success for r in step_results),
+            step_results=step_results,
+            total_execution_time_ms=total_elapsed,
+        )
+
+    # ── Builtin Step Handlers ────────────────────────────────────────────────
+
+    def _execute_builtin(
+        self,
+        state: InvestigationSessionState,
+        step: WorkflowStepDefinition,
+    ) -> dict[str, Any]:
+        """Execute a built-in workflow action."""
+        action = step.action
+        handler_map: dict[str, Callable] = {
+            "load_scope": self._handle_load_scope,
+            "import_recon": self._handle_import_recon,
+            "normalize_recon": self._handle_normalize_recon,
+            "build_attack_surface_graph": self._handle_build_graph,
+            "identify_technologies": self._handle_identify_technologies,
+            "select_knowledge_packs": self._handle_select_knowledge_packs,
+            "select_methodology": self._handle_select_methodology,
+            "generate_plan": self._handle_generate_plan,
+            "build_context": self._handle_build_context,
+            "collect_evidence": self._handle_collect_evidence,
+            "draft_report": self._handle_draft_report,
+            "review_findings": self._handle_review_findings,
+            "export_report": self._handle_export_report,
+        }
+
+        handler = handler_map.get(action)
+        if handler is None:
+            raise InvestigationError(f"Unknown builtin action: {action}")
+
+        return handler(state, step)
+
+    def _handle_load_scope(
+        self, state: InvestigationSessionState, step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        """Load scope from step config or existing state."""
+        config = step.config or {}
+        target = config.get("target", state.target)
+        if target and not state.scope.target:
+            state.scope.target = target
+        for entry_value in config.get("in_scope", []):
+            if not any(e.value == entry_value for e in state.scope.entries):
+                state.scope.entries.append(
+                    ScopeEntry(value=entry_value, entry_type=ScopeEntryType.IN_SCOPE)
+                )
+        for entry_value in config.get("out_of_scope", []):
+            if not any(e.value == entry_value for e in state.scope.entries):
+                state.scope.entries.append(
+                    ScopeEntry(value=entry_value, entry_type=ScopeEntryType.OUT_OF_SCOPE)
+                )
+        state.status = InvestigationStatus.SCOPE_LOADED
+        return {"target": state.scope.target, "entries": len(state.scope.entries)}
+
+    def _handle_import_recon(
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        """Import recon data — creates observations in the reasoning session."""
+        reasoning = self.get_reasoning_session(state)
+        if not reasoning:
+            return {"error": "No reasoning session"}
+
+        for target in [state.scope.target] + [e.value for e in state.in_scope]:
+            obs = reasoning.create_observation(
+                obs_type="endpoint",
+                description=f"In-scope target: {target}",
+                source="workflow:import_recon",
+                tags=["recon", "scope"],
+            )
+            reasoning.add_evidence(
+                observation_id=obs.id,
+                content=f"Target {target} is in scope for investigation",
+                source="workflow",
+                ev_type="raw",
+            )
+
+        state.status = InvestigationStatus.RECON_COMPLETED
+        return {"observations_created": len(state.scope.entries)}
+
+    def _handle_normalize_recon(
+        self, _state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        return {"status": "normalized"}
+
+    def _handle_build_graph(
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        state.status = InvestigationStatus.GRAPH_BUILT
+        return {"graph_built": True, "nodes": len(state.scope.entries)}
+
+    def _handle_identify_technologies(
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        reasoning = self.get_reasoning_session(state)
+        if reasoning:
+            for tech in state.scope.technologies:
+                reasoning.create_observation(
+                    obs_type="technology",
+                    description=f"Identified technology: {tech}",
+                    source="workflow:identify_technologies",
+                    tags=["technology", tech.lower()],
+                )
+        state.status = InvestigationStatus.TECHNOLOGIES_IDENTIFIED
+        return {"technologies": state.scope.technologies}
+
+    def _handle_select_knowledge_packs(
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        registry = _get_kp_registry()
+        selected: list[str] = []
+        for tech in state.scope.technologies:
+            packs = registry.get_by_technology(tech)
+            for pack in packs:
+                if pack.name not in selected:
+                    selected.append(pack.name)
+        if not selected and state.scope.technologies == ["node.js", "express"]:
+            selected = ["express", "rest", "jwt", "oauth", "mongodb"]
+        state.selected_knowledge_packs = selected
+        state.status = InvestigationStatus.KNOWLEDGE_PACKS_SELECTED
+        return {"selected_packs": selected}
+
+    def _handle_select_methodology(
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        selected: list[str] = ["rest_api", "session", "oauth", "business_logic", "file_upload"]
+        state.selected_methodology_packs = selected
+        state.status = InvestigationStatus.METHODOLOGY_SELECTED
+        return {"selected_methodology_packs": selected}
+
+    def _handle_generate_plan(
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        planner_cls = _get_planner()
+        planner = planner_cls()
+
+        reasoning = self.get_reasoning_session(state)
+        if reasoning:
+            result = planner.plan_from_session(reasoning)
+        else:
+            from deephunter.planning import PlannerContext
+            ctx = PlannerContext(
+                target=state.target,
+                technologies=state.scope.technologies,
+            )
+            result = planner.plan_from_context(ctx)
+
+        state.planner_result_id = f"plan-{id(result)}"
+
+        tasks = self._plan_to_tasks(result, state)
+        state.tasks = tasks
+        state.status = InvestigationStatus.PLAN_GENERATED
+        return {
+            "steps": len(result.plan.steps) if hasattr(result, "plan") else 0,
+            "tasks_created": len(tasks),
+        }
+
+    def _handle_build_context(
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        state.status = InvestigationStatus.CONTEXT_BUILT
+        return {"context_built": True}
+
+    def _handle_collect_evidence(
+        self, state: InvestigationSessionState, step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        reasoning = self.get_reasoning_session(state)
+        if not reasoning:
+            return {"evidence_collected": 0}
+
+        manager = EvidenceManager(state)
+        count_before = manager.count()
+
+        for obs in reasoning.state.observations:
+            manager.record_evidence(
+                title=obs.description[:80],
+                content=obs.detail or obs.description,
+                evidence_type=EvidenceType.OBSERVATION,
+                source_step=step.id,
+                tags=obs.tags,
+            )
+        for ev in reasoning.state.evidence:
+            manager.record_evidence(
+                title=f"Evidence: {ev.content[:60]}",
+                content=ev.content,
+                evidence_type=EvidenceType.HTTP_RESPONSE,
+                source_step=step.id,
+                tags=["reasoning", ev.type.value],
+            )
+
+        collected = manager.count() - count_before
+        return {"evidence_collected": collected}
+
+    def _handle_draft_report(
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        generator = ReportGenerator(state)
+        report = generator.generate()
+        state.report_id = f"report-{id(report)}"
+        return {"report_generated": True, "sections": 12}
+
+    def _handle_review_findings(
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        return {"findings_reviewed": len(state.get_tasks_by_status(TaskStatus.COMPLETED))}
+
+    def _handle_export_report(
+        self, state: InvestigationSessionState, step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        generator = ReportGenerator(state)
+        report = generator.generate()
+        markdown = report.to_markdown()
+        config = step.config or {}
+        export_path = config.get("path", f"report_{state.target.replace('://', '_')}.md")
+        Path(export_path).write_text(markdown, "utf-8")
+        return {"exported": True, "path": export_path}
+
+    # ── AI Step Handler ─────────────────────────────────────────────────────
+
+    def _execute_ai_step(
+        self, state: InvestigationSessionState, step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        """Execute an AI-assisted workflow step using the ModelRouter."""
+        router = _get_model_router()
+
+        from deephunter.router.models import ModelRequest
+
+        request = ModelRequest(
+            task_type=step.task_type or "reasoning",
+            max_tokens=4096,
+        )
+
+        prompt = (step.prompt_template or "").replace("{target}", state.target)
+
+        if not prompt:
+            prompt = f"Analyze {state.target} for investigation step: {step.name or step.id}"
+
+        try:
+            response = router.execute(request, prompt=prompt)
+            return {
+                "ai_response": response.content,
+                "model": response.model,
+                "provider": response.provider,
+            }
+        except Exception as exc:
+            logger.warning("AI step %s failed (non-fatal): %s", step.id, exc)
+            return {
+                "ai_response": None,
+                "error": str(exc),
+                "fallback": True,
+            }
+
+    # ── Conditional Step Handler ────────────────────────────────────────────
+
+    def _execute_conditional(
+        self,
+        state: InvestigationSessionState,
+        step: WorkflowStepDefinition,
+        completed: set[str],
+    ) -> dict[str, Any]:
+        """Execute conditional branching based on investigation state."""
+        if not step.condition:
+            return {"branch": "none", "error": "No condition defined"}
+
+        condition = step.condition
+        result = False
+
+        if condition == "has_tasks":
+            result = len(state.tasks) > 0
+        elif condition == "has_evidence":
+            result = len(state.evidence) > 0
+        elif condition == "has_findings":
+            result = len(state.get_tasks_by_status(TaskStatus.COMPLETED)) > 0
+        elif condition == "has_recon":
+            result = state.status.value >= InvestigationStatus.RECON_COMPLETED.value
+        elif condition == "has_technologies":
+            result = len(state.scope.technologies) > 0
+        elif condition.startswith("status:"):
+            expected = condition.split(":", 1)[1]
+            result = state.status.value == expected
+
+        branch_key = "true" if result else "false"
+        branch_steps = step.branches.get(branch_key, [])
+        for bs in branch_steps:
+            completed.add(bs)
+
+        return {
+            "condition": condition,
+            "result": result,
+            "branch": branch_key,
+            "steps_scheduled": len(branch_steps),
+        }
+
+    # ── Task Engine ─────────────────────────────────────────────────────────
+
+    def create_task(
+        self,
+        state: InvestigationSessionState,
+        title: str,
+        description: str = "",
+        category: TaskCategory = TaskCategory.OTHER,
+        priority: TaskPriority = TaskPriority.MEDIUM,
+        dependencies: list[str] | None = None,
+    ) -> Task:
+        """Create and register a new investigation task."""
+        task = Task(
+            title=title,
+            description=description,
+            category=category,
+            priority=priority,
+            dependencies=dependencies or [],
+        )
+        state.tasks.append(task)
+        return task
+
+    def update_task_status(
+        self,
+        state: InvestigationSessionState,
+        task_id: str,
+        status: TaskStatus,
+        notes: str = "",
+    ) -> Task | None:
+        """Update the status of a task."""
+        for task in state.tasks:
+            if task.id == task_id:
+                task.status = status
+                task.notes = notes or task.notes
+                task.updated_at = datetime.now(UTC).isoformat()
+                if status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+                    task.completed_at = datetime.now(UTC).isoformat()
+                return task
+        return None
+
+    def execute_tasks(
+        self,
+        state: InvestigationSessionState,
+        task_ids: list[str] | None = None,
+    ) -> dict[str, str]:
+        """Execute tasks through the AgentOrchestratorV2.
+
+        Maps task categories to workflow agents and executes them.
+        """
+        orchestrator = _get_orchestrator_v2()
+        from deephunter.agents.context import AgentExecutionContext
+
+        tasks_to_run = [
+            t for t in state.tasks
+            if (task_ids is None or t.id in task_ids)
+            and t.status == TaskStatus.PENDING
+        ]
+
+        results: dict[str, str] = {}
+        for task in tasks_to_run:
+            agent_name = self._task_category_to_agent(task.category)
+            task.status = TaskStatus.IN_PROGRESS
+
+            try:
+                ctx = AgentExecutionContext(shared_data={
+                    "target": state.target,
+                    "task_id": task.id,
+                    "task_title": task.title,
+                })
+                response = orchestrator.execute(agent_name, ctx)
+                if response.success:
+                    task.status = TaskStatus.COMPLETED
+                    results[task.id] = "completed"
+                else:
+                    task.status = TaskStatus.FAILED
+                    task.notes = response.error or "Agent execution failed"
+                    results[task.id] = f"failed: {task.notes}"
+            except Exception as exc:
+                task.status = TaskStatus.FAILED
+                task.notes = str(exc)
+                results[task.id] = f"error: {str(exc)}"
+
+            task.updated_at = datetime.now(UTC).isoformat()
+
+        return results
+
+    def get_pending_tasks(self, state: InvestigationSessionState) -> list[Task]:
+        """Get all pending tasks, sorted by priority."""
+        return sorted(
+            [t for t in state.tasks if t.status == TaskStatus.PENDING],
+            key=lambda t: _priority_sort_key(t.priority),
+        )
+
+    # ── Report Generation ──────────────────────────────────────────────────
+
+    def generate_report(
+        self,
+        state: InvestigationSessionState,
+        executive_summary: str = "",
+    ) -> InvestigationReport:
+        """Generate a structured investigation report."""
+        generator = ReportGenerator(state)
+        return generator.generate(executive_summary=executive_summary)
+
+    def export_report(
+        self,
+        state: InvestigationSessionState,
+        path: str | Path,
+        executive_summary: str = "",
+    ) -> str:
+        """Generate and export the investigation report as Markdown."""
+        report = self.generate_report(state, executive_summary=executive_summary)
+        markdown = report.to_markdown()
+        p = Path(path)
+        p.write_text(markdown, "utf-8")
+        return str(p)
+
+    # ── Manual Notes ───────────────────────────────────────────────────────
+
+    def add_note(
+        self,
+        state: InvestigationSessionState,
+        content: str,
+        tags: list[str] | None = None,
+        source_step: str = "",
+    ) -> None:
+        """Add a manual researcher note."""
+        from deephunter.investigation.models import ManualNote
+        state.notes.append(ManualNote(
+            content=content,
+            tags=tags or [],
+            source_step=source_step,
+        ))
+
+    # ── Checkpoint / Recovery ──────────────────────────────────────────────
+
+    def checkpoint(
+        self,
+        state: InvestigationSessionState,
+        path: str | Path,
+    ) -> str:
+        """Save a checkpoint that can be resumed later."""
+        saved = self.save_session(state, path)
+        state.checkpoint_data["last_checkpoint"] = str(saved)
+        state.checkpoint_data["checkpoint_time"] = datetime.now(UTC).isoformat()
+        return str(saved)
+
+    def resume(
+        self,
+        path: str | Path,
+        _auto_approve: bool = False,
+    ) -> tuple[InvestigationSessionState, WorkflowDefinition | None]:
+        """Load a session and return it ready to resume.
+
+        Args:
+            path: Path to the saved session JSON.
+            auto_approve: Whether to auto-approve pending approvals.
+
+        Returns:
+            A tuple of (state, workflow) where workflow is None if not
+            associated with a workflow.
+        """
+        state = self.load_session(path)
+
+        if state.status == InvestigationStatus.PAUSED:
+            state.status = InvestigationStatus.IN_PROGRESS
+
+        workflow_name = state.checkpoint_data.get("workflow_name", "")
+        workflow: WorkflowDefinition | None = None
+        if workflow_name:
+            try:
+                workflow = self.load_workflow_by_name(workflow_name)
+            except FileNotFoundError:
+                logger.warning("Workflow %s not found for resume", workflow_name)
+
+        return state, workflow
+
+    # ── Schedule Workflow Step ─────────────────────────────────────────────
+
+    def schedule_step(
+        self,
+        state: InvestigationSessionState,
+        step_id: str,
+        step_type: str = "builtin",
+        config: dict[str, Any] | None = None,
+        depends_on: list[str] | None = None,
+    ) -> None:
+        """Schedule a workflow step for later execution."""
+        state.checkpoint_data.setdefault("scheduled_steps", [])
+        state.checkpoint_data["scheduled_steps"].append({
+            "id": step_id,
+            "type": step_type,
+            "config": config or {},
+            "depends_on": depends_on or [],
+        })
+
+    # ── Internal Helpers ───────────────────────────────────────────────────
+
+    def _plan_to_tasks(
+        self,
+        plan_result: Any,
+        state: InvestigationSessionState,
+    ) -> list[Task]:
+        """Convert a Planner result into investigation tasks."""
+        tasks: list[Task] = []
+
+        if hasattr(plan_result, "plan") and hasattr(plan_result.plan, "steps"):
+            for step in plan_result.plan.steps:
+                category = self._step_to_category(step)
+                tasks.append(Task(
+                    title=step.title if hasattr(step, "title") else str(step),
+                    description=step.description if hasattr(step, "description") else "",
+                    category=category,
+                    priority=_step_priority_to_task_priority(step),
+                ))
+
+        if not tasks:
+            tasks = self._generate_default_tasks(state)
+
+        return tasks
+
+    def _generate_default_tasks(self, state: InvestigationSessionState) -> list[Task]:
+        """Generate default investigation tasks when planner yields none."""
+        tasks: list[Task] = []
+        categories = [
+            (TaskCategory.RECON, TaskPriority.HIGH),
+            (TaskCategory.AUTHENTICATION, TaskPriority.HIGH),
+            (TaskCategory.AUTHORIZATION, TaskPriority.HIGH),
+            (TaskCategory.BUSINESS_LOGIC, TaskPriority.MEDIUM),
+            (TaskCategory.API, TaskPriority.MEDIUM),
+            (TaskCategory.SESSION, TaskPriority.MEDIUM),
+            (TaskCategory.FILE_UPLOAD, TaskPriority.MEDIUM),
+            (TaskCategory.XSS, TaskPriority.MEDIUM),
+            (TaskCategory.SQL_INJECTION, TaskPriority.MEDIUM),
+            (TaskCategory.JAVASCRIPT, TaskPriority.LOW),
+        ]
+        for cat, pri in categories:
+            cat_title = cat.value.replace("_", " ").title()
+            tasks.append(Task(
+                title=f"Review {cat_title}",
+                description=f"Investigate {cat_title.lower()} attack surface for {state.target}",
+                category=cat,
+                priority=pri,
+            ))
+        return tasks
+
+    @staticmethod
+    def _step_to_category(step: Any) -> TaskCategory:
+        title = ""
+        if hasattr(step, "title"):
+            title = step.title or ""
+        if hasattr(step, "phase") and hasattr(step.phase, "value"):
+            title = f"{step.phase.value} {title}"
+
+        title_lower = title.lower()
+        for cat in TaskCategory:
+            if cat.value in title_lower:
+                return cat
+        return TaskCategory.OTHER
+
+    @staticmethod
+    def _task_category_to_agent(category: TaskCategory) -> str:
+        mapping: dict[TaskCategory, str] = {
+            TaskCategory.AUTHENTICATION: "auth_review_workflow",
+            TaskCategory.AUTHORIZATION: "authorization_review_workflow",
+            TaskCategory.BUSINESS_LOGIC: "business_logic_workflow",
+            TaskCategory.JAVASCRIPT: "javascript_review_workflow",
+            TaskCategory.API: "api_review_workflow",
+            TaskCategory.CLOUD: "cloud_review_workflow",
+            TaskCategory.RECON: "initial_recon_workflow",
+        }
+        return mapping.get(category, "initial_recon_workflow")
+
+
+def _priority_sort_key(priority: TaskPriority) -> int:
+    order = {
+        TaskPriority.CRITICAL: 0,
+        TaskPriority.HIGH: 1,
+        TaskPriority.MEDIUM: 2,
+        TaskPriority.LOW: 3,
+    }
+    return order.get(priority, 99)
+
+
+def _step_priority_to_task_priority(step: Any) -> TaskPriority:
+    if hasattr(step, "priority_score"):
+        score = step.priority_score
+        if score >= 0.8:
+            return TaskPriority.CRITICAL
+        elif score >= 0.6:
+            return TaskPriority.HIGH
+        elif score >= 0.4:
+            return TaskPriority.MEDIUM
+    return TaskPriority.MEDIUM

@@ -515,5 +515,105 @@ def report(ctx: click.Context, target: str, author: str, fmt: str) -> None:
         console.print(f"[red]Report generation failed: {result.error}[/red]")
 
 
+# ── Investigation Workflow CLI ─────────────────────────────────────────────
+
+
+@cli.group()
+def investigate() -> None:
+    """End-to-end investigation workflow orchestration.
+
+    Creates, manages, and runs full investigation sessions that
+    coordinate all DeepHunter subsystems.
+    """
+
+
+@investigate.command()
+@click.argument("target")
+@click.option("--name", "-n", help="Investigation name")
+@click.option("--tech", "-t", multiple=True, help="Identified technologies")
+@click.option("--workflow", "-w", default="web_app_review", help="Workflow name to execute")
+@click.option("--auto-approve", is_flag=True, help="Auto-approve all approval steps")
+@click.option("--output", "-o", default="investigation_report.md", help="Report output path")
+def run(target: str, name: str | None, tech: tuple[str, ...], workflow: str, auto_approve: bool, output: str) -> None:
+    """Run a complete investigation workflow against a target."""
+    from deephunter.investigation.orchestrator import InvestigationOrchestrator
+    orch = InvestigationOrchestrator()
+
+    tech_list = list(tech) if tech else []
+    state = orch.create_session(target, name=name or "", technologies=tech_list)
+    console.print(f"[green]Created investigation session: {state.session_id}[/green]")
+
+    try:
+        wf = orch.load_workflow_by_name(workflow)
+        console.print(f"[bold]Running workflow:[/bold] {wf.name}")
+    except FileNotFoundError:
+        console.print(f"[yellow]Workflow '{workflow}' not found, using default workflow.[/yellow]")
+        from deephunter.investigation.models import WorkflowStepDefinition, WorkflowDefinition, WorkflowStepType
+        wf = WorkflowDefinition(
+            name="default",
+            steps=[
+                WorkflowStepDefinition(id="scope", step_type=WorkflowStepType.BUILTIN, action="load_scope"),
+                WorkflowStepDefinition(id="plan", step_type=WorkflowStepType.BUILTIN, action="generate_plan", depends_on=["scope"]),
+                WorkflowStepDefinition(id="report", step_type=WorkflowStepType.BUILTIN, action="draft_report", depends_on=["plan"]),
+            ],
+        )
+
+    with console.status("[bold green]Executing investigation workflow...") as status:
+        result = orch.execute_workflow(state, wf, auto_approve=auto_approve)
+
+    if result.success:
+        console.print(f"[green]Workflow completed in {result.total_execution_time_ms:.0f}ms[/green]")
+    else:
+        failed = [r for r in result.step_results if not r.success]
+        for f in failed:
+            console.print(f"[red]Step '{f.step_id}' failed: {f.error}[/red]")
+        console.print("[yellow]Workflow paused. Resume with checkpoint.[/yellow]")
+
+    report_path = orch.export_report(state, output)
+    console.print(f"[green]Report written to {report_path}[/green]")
+
+
+@investigate.command()
+@click.argument("path")
+def resume(path: str) -> None:
+    """Resume a previously checkpointed investigation."""
+    from deephunter.investigation.orchestrator import InvestigationOrchestrator
+    orch = InvestigationOrchestrator()
+    state, workflow = orch.resume(path)
+    console.print(f"[green]Resumed investigation: {state.name or state.target} (status: {state.status.value})[/green]")
+    console.print(f"[green]Checkpoint: {len(state.completed_steps)} steps completed[/green]")
+
+
+@investigate.command()
+@click.argument("target")
+@click.option("--output", "-o", default="session.json", help="Session output path")
+def init(target: str, output: str) -> None:
+    """Create a new investigation session."""
+    from deephunter.investigation.orchestrator import InvestigationOrchestrator
+    orch = InvestigationOrchestrator()
+    state = orch.create_session(target)
+    orch.save_session(state, output)
+    console.print(f"[green]Created session {state.session_id} for {target}[/green]")
+    console.print(f"[green]Saved to {output}[/green]")
+
+
+@investigate.command()
+def list_workflows() -> None:
+    """List available YAML workflow definitions."""
+    from deephunter.investigation.orchestrator import InvestigationOrchestrator
+    orch = InvestigationOrchestrator()
+    workflows = orch.list_workflows()
+    if not workflows:
+        console.print("[yellow]No workflows found.[/yellow]")
+        return
+    table = Table(title="Available Workflows")
+    table.add_column("Name", style="cyan")
+    table.add_column("Description")
+    table.add_column("Path", style="dim")
+    for w in workflows:
+        table.add_row(w["name"], w["description"][:60], w["path"])
+    console.print(table)
+
+
 if __name__ == "__main__":
     cli()

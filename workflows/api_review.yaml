@@ -1,0 +1,84 @@
+name: API Security Review
+description: Focused workflow for REST/GraphQL API security investigation
+version: "1.0"
+tags:
+  - api
+  - rest
+  - graphql
+
+steps:
+  - id: load_scope
+    name: Load Scope
+    type: builtin
+    action: load_scope
+
+  - id: import_recon
+    name: Import Recon
+    type: builtin
+    action: import_recon
+    depends_on:
+      - load_scope
+
+  - id: build_graph
+    name: Build Graph
+    type: builtin
+    action: build_attack_surface_graph
+    depends_on:
+      - import_recon
+
+  - id: identify_technologies
+    name: Identify Technologies
+    type: builtin
+    action: identify_technologies
+    depends_on:
+      - build_graph
+
+  - id: conditional_branch
+    name: Check for GraphQL
+    type: conditional
+    condition: "has_technologies"
+    branches:
+      "true":
+        - graphql_review
+      "false":
+        - rest_review
+    depends_on:
+      - identify_technologies
+
+  - id: graphql_review
+    name: GraphQL Review
+    type: ai
+    task_type: reasoning
+    prompt_template: "Review the GraphQL API at {target} for common GraphQL vulnerabilities: introspection, batching attacks, deep recursion, authorization bypass."
+    depends_on:
+      - conditional_branch
+
+  - id: rest_review
+    name: REST API Review
+    type: ai
+    task_type: reasoning
+    prompt_template: "Review the REST API at {target} for common API vulnerabilities: IDOR, mass assignment, rate limiting, authentication bypass."
+    depends_on:
+      - conditional_branch
+
+  - id: generate_plan
+    name: Generate Plan
+    type: builtin
+    action: generate_plan
+    depends_on:
+      - graphql_review
+      - rest_review
+
+  - id: collect_evidence
+    name: Collect Evidence
+    type: builtin
+    action: collect_evidence
+    depends_on:
+      - generate_plan
+
+  - id: draft_report
+    name: Draft Report
+    type: builtin
+    action: draft_report
+    depends_on:
+      - collect_evidence
