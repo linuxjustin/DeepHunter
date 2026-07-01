@@ -48,6 +48,7 @@ logger = get_logger(__name__)
 _INVESTIGATION_SESSION_CLS = None
 _PLANNER_CLS = None
 _ORCHESTRATOR_V2_CLS = None
+_ORCHESTRATOR_V2_INSTANCE = None
 _MODEL_ROUTER_CLS = None
 _CONTEXT_ENGINE_CLS = None
 _KP_REGISTRY = None
@@ -71,11 +72,14 @@ def _get_planner():
 
 
 def _get_orchestrator_v2():
-    global _ORCHESTRATOR_V2_CLS
-    if _ORCHESTRATOR_V2_CLS is None:
+    global _ORCHESTRATOR_V2_INSTANCE
+    if _ORCHESTRATOR_V2_INSTANCE is None:
         from deephunter.agents.orchestrator_v2 import AgentOrchestratorV2
-        _ORCHESTRATOR_V2_CLS = AgentOrchestratorV2
-    return _ORCHESTRATOR_V2_CLS
+        from deephunter.agents.security_agents import register_security_agents
+        _ORCHESTRATOR_V2_INSTANCE = AgentOrchestratorV2()
+        for name, agent in register_security_agents().items():
+            _ORCHESTRATOR_V2_INSTANCE.register_agent(agent)
+    return _ORCHESTRATOR_V2_INSTANCE
 
 
 def _get_model_router():
