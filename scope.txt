@@ -1,0 +1,14 @@
+# DeepHunter Sample Scope File
+#
+# Format:
+#   - Lines starting with # are comments
+#   - Lines starting with ! are out-of-scope
+#   - All other lines are in-scope entries
+#
+# Examples:
+
+# In-scope targets
+*.example.com
+!dev.example.com
+api.example.com
+https://app.example.com

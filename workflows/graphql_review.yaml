@@ -1,0 +1,92 @@
+name: GraphQL Security Review
+description: Focused workflow for GraphQL API security investigation
+version: "1.0"
+tags:
+  - graphql
+  - api
+  - introspection
+
+steps:
+  - id: load_scope
+    name: Load Scope
+    type: builtin
+    action: load_scope
+
+  - id: import_recon
+    name: Import Recon
+    type: builtin
+    action: import_recon
+    depends_on:
+      - load_scope
+
+  - id: build_graph
+    name: Build Graph
+    type: builtin
+    action: build_attack_surface_graph
+    depends_on:
+      - import_recon
+
+  - id: identify_technologies
+    name: Identify Technologies
+    type: builtin
+    action: identify_technologies
+    depends_on:
+      - build_graph
+
+  - id: select_knowledge_packs
+    name: Select Knowledge Packs
+    type: builtin
+    action: select_knowledge_packs
+    depends_on:
+      - identify_technologies
+
+  - id: select_methodology
+    name: Select Methodology
+    type: builtin
+    action: select_methodology
+    depends_on:
+      - identify_technologies
+
+  - id: graphql_introspection
+    name: GraphQL Introspection
+    type: ai
+    task_type: reasoning
+    prompt_template: "Query the GraphQL endpoint at {target} for introspection data to discover the schema, types, and queries available."
+    depends_on:
+      - select_knowledge_packs
+
+  - id: graphql_analysis
+    name: GraphQL Security Analysis
+    type: ai
+    task_type: reasoning
+    prompt_template: "Analyze the GraphQL API at {target} for common vulnerabilities: introspection enabled in production, batching attacks, deep recursion, alias overuse, authorization bypass, information disclosure."
+    depends_on:
+      - graphql_introspection
+
+  - id: generate_plan
+    name: Generate Plan
+    type: builtin
+    action: generate_plan
+    depends_on:
+      - graphql_analysis
+
+  - id: collect_evidence
+    name: Collect Evidence
+    type: builtin
+    action: collect_evidence
+    depends_on:
+      - generate_plan
+
+  - id: draft_report
+    name: Draft Report
+    type: builtin
+    action: draft_report
+    depends_on:
+      - collect_evidence
+
+  - id: export_report
+    name: Export Report
+    type: builtin
+    action: export_report
+    depends_on:
+      - draft_report

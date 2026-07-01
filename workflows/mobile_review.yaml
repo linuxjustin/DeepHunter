@@ -1,0 +1,92 @@
+name: Mobile Security Review
+description: Workflow for mobile application API security investigation
+version: "1.0"
+tags:
+  - mobile
+  - api
+  - android
+  - ios
+
+steps:
+  - id: load_scope
+    name: Load Scope
+    type: builtin
+    action: load_scope
+
+  - id: import_recon
+    name: Import Recon
+    type: builtin
+    action: import_recon
+    depends_on:
+      - load_scope
+
+  - id: identify_technologies
+    name: Identify Technologies
+    type: builtin
+    action: identify_technologies
+    depends_on:
+      - import_recon
+
+  - id: select_knowledge_packs
+    name: Select Knowledge Packs
+    type: builtin
+    action: select_knowledge_packs
+    depends_on:
+      - identify_technologies
+
+  - id: select_methodology
+    name: Select Methodology
+    type: builtin
+    action: select_methodology
+    depends_on:
+      - identify_technologies
+
+  - id: api_discovery
+    name: API Discovery
+    type: builtin
+    action: build_attack_surface_graph
+    depends_on:
+      - select_knowledge_packs
+
+  - id: mobile_api_analysis
+    name: Mobile API Analysis
+    type: ai
+    task_type: reasoning
+    prompt_template: "Analyze the mobile API endpoints at {target} for common mobile vulnerabilities: insecure token storage, improper SSL pinning, credential leakage, API key exposure, insecure data transmission."
+    depends_on:
+      - api_discovery
+
+  - id: auth_testing
+    name: Authentication Testing
+    type: builtin
+    action: execute_tasks
+    depends_on:
+      - mobile_api_analysis
+
+  - id: generate_plan
+    name: Generate Plan
+    type: builtin
+    action: generate_plan
+    depends_on:
+      - auth_testing
+
+  - id: collect_evidence
+    name: Collect Evidence
+    type: builtin
+    action: collect_evidence
+    depends_on:
+      - generate_plan
+
+  - id: draft_report
+    name: Draft Report
+    type: builtin
+    action: draft_report
+    depends_on:
+      - collect_evidence
+
+  - id: export_report
+    name: Export Report
+    type: builtin
+    action: export_report
+    depends_on:
+      - draft_report

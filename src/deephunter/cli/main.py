@@ -608,6 +608,287 @@ def report(ctx: click.Context, target: str, author: str, fmt: str) -> None:
         console.print(f"[red]Report generation failed: {result.error}[/red]")
 
 
+@cli.command()
+@click.argument("scope_file", type=click.Path(exists=True))
+@click.option("--profile", "-p", default="bugbounty", type=click.Choice(["passive", "bugbounty", "api", "graphql", "cloud", "mobile", "custom"]), help="Execution profile")
+@click.option("--provider", default="ollama", help="AI provider (ollama, openai, anthropic)")
+@click.option("--name", "-n", default="", help="Investigation name")
+@click.option("--output", "-o", default="", help="Output report path")
+@click.option("--auto-approve", is_flag=True, help="Auto-approve passive steps")
+@click.option("--workspace", "-w", default="", help="Workspace directory")
+@click.pass_context
+def run(ctx: click.Context, scope_file: str, profile: str, provider: str, name: str, output: str, auto_approve: bool, workspace: str) -> None:
+    """Run a complete investigation with the specified scope and profile.
+
+    This is the main entry point for orchestrating an entire bug bounty
+    investigation workflow.
+
+    Example:
+
+        deephunter run --scope scope.txt --profile bugbounty --provider claude
+    """
+    from deephunter.investigation.orchestrator import InvestigationOrchestrator
+    from deephunter.investigation.orchestrator_extensions import OrchestratorExtensions, RichProgressCallback
+    from deephunter.investigation.profile_registry import get_profile
+
+    cfg: DeepHunterConfig = ctx.obj["config"]
+
+    p = get_profile(profile)
+    if not p:
+        console.print(f"[red]Unknown profile: {profile}[/red]")
+        return
+
+    console.print(f"[bold cyan]DeepHunter Investigation Orchestrator[/bold cyan]")
+    console.print(f"Profile: [green]{p.name}[/green] - {p.description}")
+    console.print(f"Provider: [green]{provider}[/green]")
+    console.print(f"Scope: [green]{scope_file}[/green]")
+    console.print()
+
+    scope_entries = OrchestratorExtensions.parse_scope_file(scope_file)
+    is_valid, errors = OrchestratorExtensions.validate_scope(scope_entries)
+    if not is_valid:
+        console.print("[red]Scope validation failed:[/red]")
+        for err in errors:
+            console.print(f"  - {err}")
+        return
+
+    console.print(f"[green]Scope validated: {len(scope_entries)} entries[/green]")
+
+    target = scope_entries[0].value if scope_entries else "unknown"
+
+    orch = InvestigationOrchestrator()
+
+    state = orch.create_session(
+        target=target,
+        name=name or f"Investigation-{profile}",
+        scope_entries=scope_entries,
+    )
+
+    console.print(f"[green]Created investigation session: {state.session_id}[/green]")
+
+    try:
+        wf = orch.load_workflow_by_name(p.workflow_name)
+        console.print(f"[bold]Workflow:[/bold] {wf.name}")
+    except FileNotFoundError:
+        console.print(f"[yellow]Workflow '{p.workflow_name}' not found[/yellow]")
+        return
+
+    console.print()
+    progress = RichProgressCallback()
+
+    from deephunter.investigation.models import WorkflowStepDefinition, WorkflowDefinition, WorkflowStepType
+
+    default_steps = [
+        WorkflowStepDefinition(id="load_scope", step_type=WorkflowStepType.BUILTIN, action="load_scope"),
+        WorkflowStepDefinition(id="import_recon", step_type=WorkflowStepType.BUILTIN, action="import_recon", depends_on=["load_scope"]),
+        WorkflowStepDefinition(id="normalize_recon", step_type=WorkflowStepType.BUILTIN, action="normalize_recon", depends_on=["import_recon"]),
+        WorkflowStepDefinition(id="build_graph", step_type=WorkflowStepType.BUILTIN, action="build_attack_surface_graph", depends_on=["normalize_recon"]),
+        WorkflowStepDefinition(id="identify_technologies", step_type=WorkflowStepType.BUILTIN, action="identify_technologies", depends_on=["build_graph"]),
+        WorkflowStepDefinition(id="select_knowledge_packs", step_type=WorkflowStepType.BUILTIN, action="select_knowledge_packs", depends_on=["identify_technologies"]),
+        WorkflowStepDefinition(id="select_methodology", step_type=WorkflowStepType.BUILTIN, action="select_methodology", depends_on=["identify_technologies"]),
+        WorkflowStepDefinition(id="generate_plan", step_type=WorkflowStepType.BUILTIN, action="generate_plan", depends_on=["select_knowledge_packs", "select_methodology"]),
+        WorkflowStepDefinition(id="build_context", step_type=WorkflowStepType.BUILTIN, action="build_context", depends_on=["generate_plan"]),
+        WorkflowStepDefinition(id="execute_tasks", step_type=WorkflowStepType.BUILTIN, action="execute_tasks", depends_on=["build_context"]),
+        WorkflowStepDefinition(id="collect_evidence", step_type=WorkflowStepType.BUILTIN, action="collect_evidence", depends_on=["execute_tasks"]),
+        WorkflowStepDefinition(id="draft_report", step_type=WorkflowStepType.BUILTIN, action="draft_report", depends_on=["collect_evidence"]),
+    ]
+
+    if not auto_approve and p.require_manual_approval:
+        default_steps.append(
+            WorkflowStepDefinition(
+                id="review_approval",
+                step_type=WorkflowStepType.APPROVAL,
+                approval_message="Review findings and approve proceeding with investigation",
+                depends_on=["draft_report"],
+            )
+        )
+
+    default_steps.append(
+        WorkflowStepDefinition(id="export_report", step_type=WorkflowStepType.BUILTIN, action="export_report",
+                               config={"path": output or f"report_{target.replace('://', '_')}.md"},
+                               depends_on=["draft_report", "review_approval"] if not auto_approve else ["draft_report"])
+    )
+
+    workflow = WorkflowDefinition(name=f"{profile}_workflow", steps=default_steps)
+
+    console.print("[bold]Starting investigation...[/bold]")
+    result = orch.execute_workflow(state, workflow, auto_approve=auto_approve or p.auto_approve_passive)
+
+    if result.success:
+        console.print(f"[green]Investigation completed in {result.total_execution_time_ms:.0f}ms[/green]")
+    else:
+        failed = [r for r in result.step_results if not r.success]
+        console.print(f"[yellow]Workflow paused. {len(failed)} step(s) failed.[/yellow]")
+        for f in failed:
+            console.print(f"  [red]Step '{f.step_id}': {f.error}[/red]")
+
+    if output:
+        report_path = orch.export_report(state, output or f"report_{target.replace('://', '_')}.md")
+        console.print(f"[green]Report written to {report_path}[/green]")
+
+
+@cli.group()
+def project() -> None:
+    """Project management commands.
+
+    Create and manage investigation projects.
+    """
+    pass
+
+
+@project.command("create")
+@click.argument("name")
+@click.option("--description", "-d", default="", help="Project description")
+@click.option("--workspace", "-w", default="./workspace", help="Workspace directory")
+def project_create(name: str, description: str, workspace: str) -> None:
+    """Create a new investigation project."""
+    from deephunter.workspace.models import Project, ProjectStatus, WorkspaceState, Workspace
+
+    ws_path = Path(workspace)
+    ws_path.mkdir(parents=True, exist_ok=True)
+
+    ws_state = WorkspaceState()
+    project = Project(name=name, description=description, status=ProjectStatus.ACTIVE)
+    ws_state.projects.append(project)
+
+    ws = Workspace(name=name, state=ws_state)
+
+    ws_file = ws_path / f"{name.replace(' ', '_').lower()}_workspace.json"
+    import json
+    ws_file.write_text(json.dumps(ws.model_dump_for_storage(), indent=2, default=str), "utf-8")
+
+    console.print(f"[green]Created project: {name}[/green]")
+    console.print(f"[green]Workspace: {ws_file}[/green]")
+
+
+@cli.group()
+def workspace() -> None:
+    """Workspace management commands.
+
+    Manage investigation workspaces and view project state.
+    """
+    pass
+
+
+@workspace.command("list")
+@click.option("--path", "-p", default="./workspace", help="Workspace directory")
+def workspace_list(path: str) -> None:
+    """List all projects in the workspace."""
+    ws_path = Path(path)
+    if not ws_path.exists():
+        console.print("[yellow]No workspace found.[/yellow]")
+        return
+
+    projects = []
+    for f in ws_path.glob("*_workspace.json"):
+        import json
+        try:
+            data = json.loads(f.read_text("utf-8"))
+            projects.append((f.stem.replace("_workspace", ""), data.get("name", ""), data.get("state", {}).get("projects", [])))
+        except Exception:
+            pass
+
+    if not projects:
+        console.print("[yellow]No projects found.[/yellow]")
+        return
+
+    table = Table(title="Workspace Projects")
+    table.add_column("File", style="dim")
+    table.add_column("Name")
+    table.add_column("Projects", style="cyan")
+    for stem, name, proj_list in projects:
+        table.add_row(stem, name, str(len(proj_list)))
+    console.print(table)
+
+
+@cli.group()
+def provider() -> None:
+    """AI provider management commands.
+
+    Configure and test LLM providers.
+    """
+    pass
+
+
+@provider.command("list")
+def provider_list() -> None:
+    """List available AI providers."""
+    from deephunter.investigation.profile_registry import list_profile_names
+
+    providers = [
+        ("ollama", "Local Ollama instance", "default"),
+        ("openai", "OpenAI GPT models", "api_key required"),
+        ("anthropic", "Claude models", "api_key required"),
+        ("deepseek", "DeepSeek models", "api_key required"),
+    ]
+
+    table = Table(title="Available AI Providers")
+    table.add_column("Name", style="cyan")
+    table.add_column("Description", style="white")
+    table.add_column("Auth", style="dim")
+    for name, desc, auth in providers:
+        table.add_row(name, desc, auth)
+    console.print(table)
+
+
+@provider.command("test")
+@click.argument("provider_name", default="ollama")
+@click.option("--model", "-m", default="", help="Model name")
+def provider_test(provider_name: str, model: str) -> None:
+    """Test an AI provider connection."""
+    console.print(f"[cyan]Testing provider: {provider_name}[/cyan]")
+    console.print("[yellow]Provider test not yet implemented[/yellow]")
+
+
+@cli.group()
+def config() -> None:
+    """Configuration management commands.
+
+    View and edit DeepHunter configuration.
+    """
+    pass
+
+
+@config.command("show")
+@click.option("--format", "fmt", default="text", type=click.Choice(["text", "yaml", "json"]))
+def config_show(fmt: str) -> None:
+    """Show current configuration."""
+    cfg = DeepHunterConfig.default()
+
+    if fmt == "json":
+        import json
+        console.print(json.dumps(cfg.model_dump(), indent=2, default=str))
+    elif fmt == "yaml":
+        import yaml
+        console.print(yaml.dump(cfg.model_dump(), default_flow_style=False))
+    else:
+        console.print("[bold]DeepHunter Configuration[/bold]")
+        console.print(f"Data directory: {cfg.data_dir}")
+        console.print(f"Output directory: {cfg.output_dir}")
+        console.print(f"LLM Provider: {cfg.llm.provider}")
+        console.print(f"LLM Model: {cfg.llm.model}")
+        console.print(f"Log level: {cfg.log_level}")
+
+
+@config.command("profiles")
+def config_profiles() -> None:
+    """List available execution profiles."""
+    from deephunter.investigation.profile_registry import list_profiles
+
+    profiles = list_profiles()
+
+    table = Table(title="Available Execution Profiles")
+    table.add_column("Name", style="cyan")
+    table.add_column("Type", style="green")
+    table.add_column("Description")
+    table.add_column("Est. Duration", style="yellow")
+
+    for p in profiles:
+        table.add_row(p.name, p.profile_type.value, p.description[:50], f"{p.estimated_duration_minutes} min")
+
+    console.print(table)
+
+
 # ── Investigation Workflow CLI ─────────────────────────────────────────────
 
 
