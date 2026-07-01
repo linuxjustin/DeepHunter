@@ -94,7 +94,7 @@ steps:
     name: Execute Investigation Tasks
     description: Run the investigation tasks from the generated plan
     type: builtin
-    action: build_context
+    action: execute_tasks
     depends_on:
       - generate_plan
       - manual_approval

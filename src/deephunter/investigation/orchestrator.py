@@ -384,6 +384,7 @@ class InvestigationOrchestrator:
             "select_methodology": self._handle_select_methodology,
             "generate_plan": self._handle_generate_plan,
             "build_context": self._handle_build_context,
+            "execute_tasks": self._handle_execute_tasks,
             "collect_evidence": self._handle_collect_evidence,
             "draft_report": self._handle_draft_report,
             "review_findings": self._handle_review_findings,
@@ -443,9 +444,33 @@ class InvestigationOrchestrator:
         return {"observations_created": len(state.scope.entries)}
 
     def _handle_normalize_recon(
-        self, _state: InvestigationSessionState, _step: WorkflowStepDefinition
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
     ) -> dict[str, Any]:
-        return {"status": "normalized"}
+        entries = state.scope.entries
+        original_count = len(entries)
+
+        seen: set[str] = set()
+        normalized_entries: list[ScopeEntry] = []
+        duplicates = 0
+
+        for entry in entries:
+            normalized = entry.value.strip().rstrip("/").lower()
+            if not normalized:
+                duplicates += 1
+                continue
+            if normalized in seen:
+                duplicates += 1
+                continue
+            seen.add(normalized)
+            normalized_entries.append(entry)
+
+        state.scope.entries = normalized_entries
+        return {
+            "status": "normalized",
+            "original_count": original_count,
+            "deduplicated": duplicates,
+            "remaining": len(normalized_entries),
+        }
 
     def _handle_build_graph(
         self, state: InvestigationSessionState, _step: WorkflowStepDefinition
@@ -557,6 +582,24 @@ class InvestigationOrchestrator:
     ) -> dict[str, Any]:
         state.status = InvestigationStatus.CONTEXT_BUILT
         return {"context_built": True}
+
+    def _handle_execute_tasks(
+        self, state: InvestigationSessionState, _step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        pending = [t for t in state.tasks if t.status == TaskStatus.PENDING]
+        if not pending:
+            return {"tasks_executed": 0, "message": "No pending tasks"}
+
+        results = self.execute_tasks(state)
+        completed = sum(1 for r in results.values() if r == "completed")
+        failed = sum(1 for v in results.values() if v.startswith("failed") or v.startswith("error"))
+        state.status = InvestigationStatus.IN_PROGRESS
+        return {
+            "tasks_executed": len(pending),
+            "completed": completed,
+            "failed": failed,
+            "details": results,
+        }
 
     def _handle_collect_evidence(
         self, state: InvestigationSessionState, step: WorkflowStepDefinition
@@ -951,15 +994,15 @@ class InvestigationOrchestrator:
     @staticmethod
     def _task_category_to_agent(category: TaskCategory) -> str:
         mapping: dict[TaskCategory, str] = {
-            TaskCategory.AUTHENTICATION: "auth_review_workflow",
-            TaskCategory.AUTHORIZATION: "authorization_review_workflow",
-            TaskCategory.BUSINESS_LOGIC: "business_logic_workflow",
-            TaskCategory.JAVASCRIPT: "javascript_review_workflow",
-            TaskCategory.API: "api_review_workflow",
-            TaskCategory.CLOUD: "cloud_review_workflow",
-            TaskCategory.RECON: "initial_recon_workflow",
+            TaskCategory.AUTHENTICATION: "auth_review",
+            TaskCategory.AUTHORIZATION: "authorization_review",
+            TaskCategory.BUSINESS_LOGIC: "business_logic",
+            TaskCategory.JAVASCRIPT: "javascript_review",
+            TaskCategory.API: "api_review",
+            TaskCategory.CLOUD: "cloud_review",
+            TaskCategory.RECON: "initial_recon",
         }
-        return mapping.get(category, "initial_recon_workflow")
+        return mapping.get(category, "initial_recon")
 
 
 def _priority_sort_key(priority: TaskPriority) -> int:

@@ -37,8 +37,8 @@ class WebSearchPlugin(BaseToolPlugin):
     )
 
     def execute(self, context: ExecutionContext) -> str | bytes | None:
-        query = context.params.get("query", "")
-        limit = int(context.params.get("limit", 10))
+        query = context.args.get("query", "")
+        limit = int(context.args.get("limit", 10))
 
         if not query:
             return "No query provided"

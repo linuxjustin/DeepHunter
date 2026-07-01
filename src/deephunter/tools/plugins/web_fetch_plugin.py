@@ -37,13 +37,13 @@ class WebFetchPlugin(BaseToolPlugin):
     )
 
     def execute(self, context: ExecutionContext) -> str | bytes | None:
-        url = context.params.get("url", "")
+        url = context.args.get("url", "")
         if not url:
             return "No URL provided"
 
-        method = context.params.get("method", "GET").upper()
-        headers_str = context.params.get("headers", "")
-        body = context.params.get("body", "")
+        method = context.args.get("method", "GET").upper()
+        headers_str = context.args.get("headers", "")
+        body = context.args.get("body", "")
 
         headers = self._parse_headers(headers_str)
 

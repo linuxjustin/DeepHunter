@@ -31,6 +31,7 @@ BUILTIN_ACTIONS: dict[str, str] = {
     "select_methodology": "Select methodology packs for relevant bug classes",
     "generate_plan": "Generate an investigation plan using the Planner",
     "build_context": "Build context using the Context Engine",
+    "execute_tasks": "Execute manual investigation tasks from the plan",
     "collect_evidence": "Collect and store structured evidence",
     "draft_report": "Draft the final investigation report",
     "review_findings": "Review and triage draft findings",
