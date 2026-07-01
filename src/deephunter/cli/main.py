@@ -548,34 +548,109 @@ def scan(ctx: click.Context, target: str, **flags: bool) -> None:
         console.print(f"[red]Scan failed: {result.error}[/red]")
 
 
-@cli.command()
-@click.option("--benchmark", "-b", multiple=True, help="Specific benchmark(s) to run (default: all)")
-@click.option("--format", "fmt", default="table", type=click.Choice(["table", "json"]), help="Output format")
+@cli.command("evaluate")
+@click.argument("target", required=False)
+@click.option("--profile", "-p", default="bugbounty", type=click.Choice(["juiceshop", "dvwa", "webgoat", "crapi", "vampi", "custom"]), help="Benchmark profile")
+@click.option("--output", "-o", default="evaluation_report.md", help="Output report path")
+@click.option("--auto-approve", is_flag=True, help="Auto-approve all steps")
 @click.pass_context
-def benchmark(ctx: click.Context, benchmark: tuple[str, ...], fmt: str) -> None:
-    """Run evaluation benchmarks against subsystems."""
-    from deephunter.evaluation.datasets.app_benchmarks import get_app_benchmarks, get_app_benchmark
-    if benchmark:
-        entries = [get_app_benchmark(b) for b in benchmark if get_app_benchmark(b)]
-    else:
-        entries = get_app_benchmarks()
-    if not entries:
-        console.print("[yellow]No benchmarks found.[/yellow]")
+def evaluate(ctx: click.Context, target: str | None, profile: str, output: str, auto_approve: bool) -> None:
+    """Run evaluation benchmarks against intentionally vulnerable targets.
+
+    Supported benchmarks:
+        - juiceshop: OWASP Juice Shop (Node.js)
+        - dvwa: Damn Vulnerable Web Application (PHP)
+        - webgoat: OWASP WebGoat (Java)
+        - crapi: crack the crackable API
+        - vampi: Vulnerable API
+
+    Example:
+
+        deephunter evaluate --target http://localhost:3000 --profile juiceshop
+    """
+    from deephunter.evaluation.datasets.app_benchmarks import get_app_benchmark
+
+    if not target:
+        console.print("[yellow]No target specified. Running dry-run benchmark...[/yellow]")
+        target = "http://localhost:3000"
+
+    bench = get_app_benchmark(profile)
+    if not bench:
+        console.print(f"[yellow]Benchmark profile '{profile}' not found. Use 'deephunter benchmark' to list available.[/yellow]")
         return
-    table = Table(title=f"App Benchmarks ({len(entries)} loaded)")
-    table.add_column("Name", style="cyan")
-    table.add_column("Difficulty", style="yellow")
-    table.add_column("Bug Classes", style="green")
-    table.add_column("Steps", style="white")
-    table.add_column("Hypotheses", style="white")
-    table.add_column("CWEs", style="dim")
-    for e in entries:
-        table.add_row(
-            e.name, e.difficulty, str(len(e.input.bug_classes)),
-            str(len(e.expected.planner_steps)), str(len(e.expected.reasoning.hypotheses)),
-            ", ".join(e.cwe_ids[:3]),
-        )
-    console.print(table)
+
+    console.print(f"[bold cyan]DeepHunter Evaluation Mode[/bold cyan]")
+    console.print(f"Profile: [green]{profile}[/green]")
+    console.print(f"Target: [green]{target}[/green]")
+    console.print(f"Expected bugs: [red]{', '.join(b.name for b in bench.input.bug_classes)}[/red]")
+    console.print()
+
+    if not auto_approve:
+        console.print("[yellow]Starting evaluation. This will run the full investigation workflow.[/yellow]")
+        try:
+            import click
+            click.confirm("Continue?", abort=True)
+        except click.Abort:
+            console.print("[red]Evaluation cancelled.[/red]")
+            return
+
+    orch = InvestigationOrchestrator()
+    state = orch.create_session(
+        target=target,
+        name=f"Evaluation-{profile}",
+        scope_entries=[
+            ScopeEntry(value=target, entry_type=ScopeEntryType.IN_SCOPE)
+        ],
+        technologies=list(set(t.value for t in bench.input.technologies)) if hasattr(bench.input, 'technologies') else [],
+    )
+    state.checkpoint_data["profile_name"] = "bugbounty"
+    state.checkpoint_data["evaluation_mode"] = True
+    state.checkpoint_data["benchmark_profile"] = profile
+
+    from deephunter.investigation.models import WorkflowStepDefinition, WorkflowDefinition, WorkflowStepType
+
+    eval_steps = [
+        WorkflowStepDefinition(id="load_scope", step_type=WorkflowStepType.BUILTIN, action="load_scope"),
+        WorkflowStepDefinition(id="run_recon", step_type=WorkflowStepType.BUILTIN, action="run_recon",
+                              config={"tools": ["subfinder", "httpx"], "timeout": 300},
+                              depends_on=["load_scope"]),
+        WorkflowStepDefinition(id="build_graph", step_type=WorkflowStepType.BUILTIN, action="build_attack_surface_graph", depends_on=["run_recon"]),
+        WorkflowStepDefinition(id="identify_technologies", step_type=WorkflowStepType.BUILTIN, action="identify_technologies", depends_on=["build_graph"]),
+        WorkflowStepDefinition(id="select_knowledge_packs", step_type=WorkflowStepType.BUILTIN, action="select_knowledge_packs", depends_on=["identify_technologies"]),
+        WorkflowStepDefinition(id="generate_plan", step_type=WorkflowStepType.BUILTIN, action="generate_plan", depends_on=["select_knowledge_packs"]),
+        WorkflowStepDefinition(id="build_context", step_type=WorkflowStepType.BUILTIN, action="build_context", depends_on=["generate_plan"]),
+        WorkflowStepDefinition(id="interactive_review", step_type=WorkflowStepType.BUILTIN, action="interactive_review",
+                              config={"auto_approved": True}, depends_on=["build_context"]),
+        WorkflowStepDefinition(id="execute_tasks", step_type=WorkflowStepType.BUILTIN, action="execute_tasks", depends_on=["interactive_review"]),
+        WorkflowStepDefinition(id="draft_report", step_type=WorkflowStepType.BUILTIN, action="draft_report", depends_on=["execute_tasks"]),
+        WorkflowStepDefinition(id="export_report", step_type=WorkflowStepType.BUILTIN, action="export_report",
+                              config={"path": output}, depends_on=["draft_report"]),
+    ]
+
+    workflow = WorkflowDefinition(name=f"evaluation_{profile}", steps=eval_steps)
+
+    console.print("[bold]Running evaluation workflow...[/bold]")
+    progress = RichProgressCallback()
+    result = orch.execute_workflow(state, workflow, auto_approve=True, progress_callback=progress)
+
+    console.print()
+    if result.success:
+        console.print(f"[green]Evaluation completed in {result.total_execution_time_ms:.0f}ms[/green]")
+    else:
+        failed = [r for r in result.step_results if not r.success]
+        console.print(f"[yellow]Evaluation paused. {len(failed)} step(s) failed.[/yellow]")
+
+    report_path = orch.export_report(state, output)
+    console.print(f"[green]Report written to {report_path}[/green]")
+
+    console.print()
+    console.print(f"[bold cyan]Evaluation Summary[/bold cyan]")
+    console.print(f"Steps completed: {len(state.completed_steps)}/{len(eval_steps)}")
+    console.print(f"Tasks: {len(state.tasks)} total, {len(state.get_tasks_by_status(TaskStatus.COMPLETED))} completed")
+    console.print(f"Evidence: {len(state.evidence)} records")
+
+    with open(output) as f:
+        console.print(f"\n[bold]Report Preview:[/bold]\n{f.read()[:1000]}...")
 
 
 @cli.command()
@@ -700,7 +775,13 @@ def run(ctx: click.Context, scope_file: str, profile: str, provider: str, name: 
         WorkflowStepDefinition(id="import_recon", step_type=WorkflowStepType.BUILTIN, action="import_recon", depends_on=["load_scope"]),
         WorkflowStepDefinition(id="normalize_recon", step_type=WorkflowStepType.BUILTIN, action="normalize_recon", depends_on=["import_recon"]),
         WorkflowStepDefinition(id="build_graph", step_type=WorkflowStepType.BUILTIN, action="build_attack_surface_graph", depends_on=["normalize_recon"]),
-        WorkflowStepDefinition(id="identify_technologies", step_type=WorkflowStepType.BUILTIN, action="identify_technologies", depends_on=["build_graph"]),
+        WorkflowStepDefinition(id="run_subdomain_enum", step_type=WorkflowStepType.BUILTIN, action="run_subdomain_enum",
+                               depends_on=["build_graph"],
+                               config={"tools": ["subfinder"], "timeout": 300}),
+        WorkflowStepDefinition(id="run_web_crawl", step_type=WorkflowStepType.BUILTIN, action="run_web_crawl",
+                               depends_on=["run_subdomain_enum"],
+                               config={"tools": ["httpx"], "timeout": 300}),
+        WorkflowStepDefinition(id="identify_technologies", step_type=WorkflowStepType.BUILTIN, action="identify_technologies", depends_on=["run_web_crawl"]),
         WorkflowStepDefinition(id="select_knowledge_packs", step_type=WorkflowStepType.BUILTIN, action="select_knowledge_packs", depends_on=["identify_technologies"]),
         WorkflowStepDefinition(id="select_methodology", step_type=WorkflowStepType.BUILTIN, action="select_methodology", depends_on=["identify_technologies"]),
         WorkflowStepDefinition(id="generate_plan", step_type=WorkflowStepType.BUILTIN, action="generate_plan", depends_on=["select_knowledge_packs", "select_methodology"]),

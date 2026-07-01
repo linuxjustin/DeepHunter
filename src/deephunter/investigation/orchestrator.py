@@ -447,6 +447,9 @@ class InvestigationOrchestrator:
             "review_findings": self._handle_review_findings,
             "export_report": self._handle_export_report,
             "interactive_review": self._handle_interactive_review,
+            "run_recon": self._handle_run_recon,
+            "run_subdomain_enum": self._handle_run_subdomain_enum,
+            "run_web_crawl": self._handle_run_web_crawl,
         }
 
         handler = handler_map.get(action)
@@ -562,6 +565,181 @@ class InvestigationOrchestrator:
             "graph_built": True,
             "nodes": graph_nodes,
             "technologies": len(state.scope.technologies),
+        }
+
+    def _handle_run_recon(
+        self, state: InvestigationSessionState, step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        """Run configured recon tools against the target."""
+        from deephunter.tools.registry import ToolPluginRegistry
+        from deephunter.tools.executor import ToolExecutor
+        from deephunter.tools.context import ExecutionContext
+        from deephunter.tools.events import ToolEventBus
+
+        config = step.config or {}
+        tools_to_run = config.get("tools", ["subfinder", "httpx"])
+        max_concurrency = config.get("concurrency", 4)
+        timeout = config.get("timeout", 120.0)
+
+        event_bus = ToolEventBus()
+        registry = ToolPluginRegistry(event_bus=event_bus)
+        registry.discover()
+        executor = ToolExecutor(event_bus=event_bus)
+
+        results: dict[str, Any] = {"tools_run": 0, "hosts": 0, "endpoints": 0, "errors": []}
+
+        for entry in state.scope.entries:
+            if entry.entry_type != ScopeEntryType.IN_SCOPE:
+                continue
+
+            domain = entry.value
+            if not domain.startswith(("http://", "https://")):
+                domain = f"https://{domain}"
+
+            for tool_name in tools_to_run:
+                plugin = registry.get(tool_name)
+                if not plugin:
+                    results["errors"].append(f"Tool not found: {tool_name}")
+                    continue
+
+                health = plugin.health(None)
+                if not health.healthy:
+                    results["errors"].append(f"{tool_name}: {health.errors or 'not installed'}")
+                    continue
+
+                ctx = ExecutionContext(
+                    target=domain,
+                    args={"domain": domain},
+                    timeout=timeout,
+                )
+
+                try:
+                    report = executor.execute(plugin, ctx)
+                    if report.status.value == "success":
+                        results["tools_run"] += 1
+                        results["hosts"] += report.imported_count
+                        logger.info(f"Tool {tool_name} succeeded: {report.imported_count} imported")
+                    else:
+                        results["errors"].append(f"{tool_name}: {report.error or 'failed'}")
+                except Exception as exc:
+                    results["errors"].append(f"{tool_name}: {str(exc)}")
+
+        return results
+
+    def _handle_run_subdomain_enum(
+        self, state: InvestigationSessionState, step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        """Run subdomain enumeration tools (subfinder, assetfinder, amass)."""
+        from deephunter.tools.registry import ToolPluginRegistry
+        from deephunter.tools.executor import ToolExecutor
+        from deephunter.tools.context import ExecutionContext
+        from deephunter.tools.events import ToolEventBus
+
+        config = step.config or {}
+        tools = config.get("tools", ["subfinder"])
+        timeout = config.get("timeout", 300.0)
+
+        event_bus = ToolEventBus()
+        registry = ToolPluginRegistry(event_bus=event_bus)
+        registry.discover()
+        executor = ToolExecutor(event_bus=event_bus)
+
+        all_hosts: list[str] = []
+        errors: list[str] = []
+
+        for entry in state.scope.entries:
+            if entry.entry_type != ScopeEntryType.IN_SCOPE:
+                continue
+
+            domain = entry.value.replace("https://", "").replace("http://", "").split("/")[0]
+
+            for tool_name in tools:
+                plugin = registry.get(tool_name)
+                if not plugin:
+                    errors.append(f"Tool not found: {tool_name}")
+                    continue
+
+                health = plugin.health(None)
+                if not health.installed:
+                    errors.append(f"{tool_name}: not installed")
+                    continue
+
+                ctx = ExecutionContext(
+                    target=domain,
+                    args={"domain": domain},
+                    timeout=timeout,
+                )
+
+                try:
+                    report = executor.execute(plugin, ctx)
+                    if report.status.value == "success" and report.parsed_count > 0:
+                        all_hosts.append(f"{tool_name}: {report.parsed_count} subdomains")
+                except Exception as exc:
+                    errors.append(f"{tool_name}: {str(exc)}")
+
+        return {
+            "subdomains_found": len(all_hosts),
+            "tools_used": all_hosts,
+            "errors": errors,
+        }
+
+    def _handle_run_web_crawl(
+        self, state: InvestigationSessionState, step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        """Run web crawling tools (katana, httpx)."""
+        from deephunter.tools.registry import ToolPluginRegistry
+        from deephunter.tools.executor import ToolExecutor
+        from deephunter.tools.context import ExecutionContext
+        from deephunter.tools.events import ToolEventBus
+
+        config = step.config or {}
+        tools = config.get("tools", ["httpx"])
+        timeout = config.get("timeout", 300.0)
+
+        event_bus = ToolEventBus()
+        registry = ToolPluginRegistry(event_bus=event_bus)
+        registry.discover()
+        executor = ToolExecutor(event_bus=event_bus)
+
+        endpoints_found: list[str] = []
+        errors: list[str] = []
+
+        for entry in state.scope.entries:
+            if entry.entry_type != ScopeEntryType.IN_SCOPE:
+                continue
+
+            url = entry.value
+            if not url.startswith(("http://", "https://")):
+                url = f"https://{url}"
+
+            for tool_name in tools:
+                plugin = registry.get(tool_name)
+                if not plugin:
+                    errors.append(f"Tool not found: {tool_name}")
+                    continue
+
+                health = plugin.health(None)
+                if not health.installed:
+                    errors.append(f"{tool_name}: not installed")
+                    continue
+
+                ctx = ExecutionContext(
+                    target=url,
+                    args={"url": url},
+                    timeout=timeout,
+                )
+
+                try:
+                    report = executor.execute(plugin, ctx)
+                    if report.status.value == "success":
+                        endpoints_found.append(f"{tool_name}: {report.parsed_count} endpoints")
+                except Exception as exc:
+                    errors.append(f"{tool_name}: {str(exc)}")
+
+        return {
+            "endpoints_found": len(endpoints_found),
+            "tools_used": endpoints_found,
+            "errors": errors,
         }
 
     def _handle_identify_technologies(
