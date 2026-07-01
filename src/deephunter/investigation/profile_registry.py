@@ -66,6 +66,10 @@ class ProfileRegistry:
         if not base:
             base = BUILTIN_PROFILES["passive"]
 
+        overrides.pop("name", None)
+        overrides.pop("profile_type", None)
+        overrides.pop("description", None)
+
         profile = ExecutionProfile(
             name=name,
             profile_type=ExecutionProfileType.CUSTOM,

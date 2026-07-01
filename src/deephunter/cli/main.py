@@ -616,8 +616,10 @@ def report(ctx: click.Context, target: str, author: str, fmt: str) -> None:
 @click.option("--output", "-o", default="", help="Output report path")
 @click.option("--auto-approve", is_flag=True, help="Auto-approve passive steps")
 @click.option("--workspace", "-w", default="", help="Workspace directory")
+@click.option("--resume", "-r", is_flag=True, help="Resume from last checkpoint")
+@click.option("--session", "-s", default="", help="Path to session file to resume")
 @click.pass_context
-def run(ctx: click.Context, scope_file: str, profile: str, provider: str, name: str, output: str, auto_approve: bool, workspace: str) -> None:
+def run(ctx: click.Context, scope_file: str, profile: str, provider: str, name: str, output: str, auto_approve: bool, workspace: str, resume: bool, session: str) -> None:
     """Run a complete investigation with the specified scope and profile.
 
     This is the main entry point for orchestrating an entire bug bounty
@@ -658,13 +660,28 @@ def run(ctx: click.Context, scope_file: str, profile: str, provider: str, name: 
 
     orch = InvestigationOrchestrator()
 
-    state = orch.create_session(
-        target=target,
-        name=name or f"Investigation-{profile}",
-        scope_entries=scope_entries,
-    )
-
-    console.print(f"[green]Created investigation session: {state.session_id}[/green]")
+    if session:
+        try:
+            state, _ = orch.resume(session)
+            console.print(f"[green]Resumed investigation session: {state.session_id}[/green]")
+            console.print(f"[green]Target: {state.target}[/green]")
+            console.print(f"[green]Status: {state.status.value}[/green]")
+            console.print(f"[green]Completed steps: {len(state.completed_steps)}[/green]")
+        except FileNotFoundError:
+            console.print(f"[red]Session file not found: {session}[/red]")
+            return
+        except Exception as exc:
+            console.print(f"[red]Failed to resume session: {exc}[/red]")
+            return
+    else:
+        state = orch.create_session(
+            target=target,
+            name=name or f"Investigation-{profile}",
+            scope_entries=scope_entries,
+        )
+        state.checkpoint_data["profile_name"] = p.name
+        state.checkpoint_data["provider"] = provider
+        console.print(f"[green]Created investigation session: {state.session_id}[/green]")
 
     try:
         wf = orch.load_workflow_by_name(p.workflow_name)
@@ -688,7 +705,14 @@ def run(ctx: click.Context, scope_file: str, profile: str, provider: str, name: 
         WorkflowStepDefinition(id="select_methodology", step_type=WorkflowStepType.BUILTIN, action="select_methodology", depends_on=["identify_technologies"]),
         WorkflowStepDefinition(id="generate_plan", step_type=WorkflowStepType.BUILTIN, action="generate_plan", depends_on=["select_knowledge_packs", "select_methodology"]),
         WorkflowStepDefinition(id="build_context", step_type=WorkflowStepType.BUILTIN, action="build_context", depends_on=["generate_plan"]),
-        WorkflowStepDefinition(id="execute_tasks", step_type=WorkflowStepType.BUILTIN, action="execute_tasks", depends_on=["build_context"]),
+        WorkflowStepDefinition(
+            id="interactive_review",
+            step_type=WorkflowStepType.BUILTIN,
+            action="interactive_review",
+            depends_on=["build_context"],
+            config={"auto_approved": auto_approve or p.auto_approve_passive},
+        ),
+        WorkflowStepDefinition(id="execute_tasks", step_type=WorkflowStepType.BUILTIN, action="execute_tasks", depends_on=["interactive_review"]),
         WorkflowStepDefinition(id="collect_evidence", step_type=WorkflowStepType.BUILTIN, action="collect_evidence", depends_on=["execute_tasks"]),
         WorkflowStepDefinition(id="draft_report", step_type=WorkflowStepType.BUILTIN, action="draft_report", depends_on=["collect_evidence"]),
     ]
@@ -712,7 +736,7 @@ def run(ctx: click.Context, scope_file: str, profile: str, provider: str, name: 
     workflow = WorkflowDefinition(name=f"{profile}_workflow", steps=default_steps)
 
     console.print("[bold]Starting investigation...[/bold]")
-    result = orch.execute_workflow(state, workflow, auto_approve=auto_approve or p.auto_approve_passive)
+    result = orch.execute_workflow(state, workflow, auto_approve=auto_approve or p.auto_approve_passive, progress_callback=progress)
 
     if result.success:
         console.print(f"[green]Investigation completed in {result.total_execution_time_ms:.0f}ms[/green]")

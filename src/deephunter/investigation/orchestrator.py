@@ -243,6 +243,7 @@ class InvestigationOrchestrator:
         workflow: WorkflowDefinition,
         auto_approve: bool = False,
         callbacks: dict[str, Callable] | None = None,
+        progress_callback: "ProgressCallback | None" = None,
     ) -> WorkflowResult:
         """Execute a complete workflow definition against the given session.
 
@@ -257,12 +258,17 @@ class InvestigationOrchestrator:
         """
         step_results: list[WorkflowStepResult] = []
         total_start = time.perf_counter()
+        total_steps = len(workflow.steps)
 
         state.status = InvestigationStatus.IN_PROGRESS
 
         completed: set[str] = set()
 
-        for step in workflow.steps:
+        for idx, step in enumerate(workflow.steps, 1):
+            step_name = step.name or step.action or step.id
+            if progress_callback:
+                progress_callback.on_step_start(step.id, step_name, idx, total_steps)
+
             # Check dependencies
             missing_deps = [d for d in step.depends_on if d not in completed]
             if missing_deps:
@@ -271,6 +277,8 @@ class InvestigationOrchestrator:
                     success=False,
                     error=f"Dependencies not satisfied: {', '.join(missing_deps)}",
                 ))
+                if progress_callback:
+                    progress_callback.on_step_failed(step.id, step_name, idx, total_steps, "Missing dependencies")
                 continue
 
             # Check if we should skip (checkpoint recovery)
@@ -280,6 +288,8 @@ class InvestigationOrchestrator:
                     step_id=step.id, success=True, data={"skipped": True},
                 ))
                 completed.add(step.id)
+                if progress_callback:
+                    progress_callback.on_step_complete(step.id, step_name, idx, total_steps, 0)
                 continue
 
             # Execute step
@@ -346,8 +356,12 @@ class InvestigationOrchestrator:
             if success:
                 completed.add(step.id)
                 state.completed_steps.append(step.id)
+                if progress_callback:
+                    progress_callback.on_step_complete(step.id, step_name, idx, total_steps, elapsed)
             else:
                 logger.error("Workflow step %s failed: %s", step.id, error)
+                if progress_callback:
+                    progress_callback.on_step_failed(step.id, step_name, idx, total_steps, error)
 
             state.updated_at = datetime.now(UTC).isoformat()
 
@@ -367,12 +381,55 @@ class InvestigationOrchestrator:
 
     # ── Builtin Step Handlers ────────────────────────────────────────────────
 
+    def _resolve_step_variables(
+        self,
+        step: WorkflowStepDefinition,
+        state: InvestigationSessionState,
+    ) -> WorkflowStepDefinition:
+        """Resolve {{ variable }} references in step attributes."""
+        subs = {
+            "target": state.target,
+            "technologies": ", ".join(state.scope.technologies) if state.scope.technologies else "unknown",
+            "scope": ", ".join(e.value for e in state.scope.entries) if state.scope.entries else state.target,
+            "session_id": state.session_id,
+            "name": state.name,
+            "status": state.status.value,
+            "profile": state.checkpoint_data.get("profile_name", ""),
+            "framework": state.variables.framework,
+            "cloud_provider": state.variables.cloud_provider,
+            "auth_method": state.variables.auth_method,
+        }
+
+        def resolve(text: str) -> str:
+            if not isinstance(text, str):
+                return text
+            for key, val in subs.items():
+                text = text.replace(f"{{{{{key}}}}}", str(val))
+                text = text.replace(f"{{{key}}}", str(val))
+            return text
+
+        step.id = resolve(step.id)
+        step.name = resolve(step.name)
+        step.description = resolve(step.description)
+        step.action = resolve(step.action)
+        step.condition = resolve(step.condition)
+        step.approval_message = resolve(step.approval_message)
+
+        if step.prompt_template:
+            step.prompt_template = resolve(step.prompt_template)
+
+        if step.config:
+            step.config = {k: resolve(str(v)) if isinstance(v, str) else v for k, v in step.config.items()}
+
+        return step
+
     def _execute_builtin(
         self,
         state: InvestigationSessionState,
         step: WorkflowStepDefinition,
     ) -> dict[str, Any]:
         """Execute a built-in workflow action."""
+        step = self._resolve_step_variables(step, state)
         action = step.action
         handler_map: dict[str, Callable] = {
             "load_scope": self._handle_load_scope,
@@ -389,6 +446,7 @@ class InvestigationOrchestrator:
             "draft_report": self._handle_draft_report,
             "review_findings": self._handle_review_findings,
             "export_report": self._handle_export_report,
+            "interactive_review": self._handle_interactive_review,
         }
 
         handler = handler_map.get(action)
@@ -726,8 +784,25 @@ class InvestigationOrchestrator:
     def _handle_build_context(
         self, state: InvestigationSessionState, _step: WorkflowStepDefinition
     ) -> dict[str, Any]:
-        state.status = InvestigationStatus.CONTEXT_BUILT
-        return {"context_built": True}
+        try:
+            context_engine_cls = _get_context_engine()
+            context_engine = context_engine_cls()
+            reasoning = self.get_reasoning_session(state)
+
+            context = context_engine.build(
+                investigation_id=state.session_id,
+                plan_id=state.planner_result_id or "",
+                session=reasoning,
+            )
+            state.checkpoint_data["context"] = context.model_dump() if context else {}
+            state.checkpoint_data["context_built"] = True
+            state.status = InvestigationStatus.CONTEXT_BUILT
+            return {"context_built": True, "sections": len(context.sections) if context and hasattr(context, 'sections') else 0}
+        except Exception as exc:
+            logger.warning("Context building failed (non-fatal): %s", exc)
+            state.checkpoint_data["context_built"] = True
+            state.status = InvestigationStatus.CONTEXT_BUILT
+            return {"context_built": True, "warning": str(exc)}
 
     def _handle_execute_tasks(
         self, state: InvestigationSessionState, _step: WorkflowStepDefinition
@@ -801,6 +876,93 @@ class InvestigationOrchestrator:
         Path(export_path).write_text(markdown, "utf-8")
         return {"exported": True, "path": export_path}
 
+    def _handle_interactive_review(
+        self, state: InvestigationSessionState, step: WorkflowStepDefinition
+    ) -> dict[str, Any]:
+        """Display investigation summary and await researcher confirmation."""
+        from deephunter.investigation.profiles import get_profile
+
+        profile_name = state.checkpoint_data.get("profile_name", "bugbounty")
+        profile = get_profile(profile_name) if profile_name else None
+
+        config = step.config or {}
+        auto_approved = config.get("auto_approved", False)
+
+        lines = [
+            "\n" + "=" * 60,
+            "INVESTIGATION REVIEW",
+            "=" * 60,
+            "",
+            f"Target: {state.target}",
+            f"Name: {state.name or 'Unnamed'}",
+            f"Session: {state.session_id}",
+            f"Status: {state.status.value}",
+            "",
+        ]
+
+        if state.scope.entries:
+            in_scope = state.in_scope
+            out_scope = state.out_of_scope
+            lines.append(f"Scope: {len(in_scope)} in-scope, {len(out_scope)} out-of-scope")
+            for e in in_scope[:5]:
+                lines.append(f"  + {e.value}")
+            if len(in_scope) > 5:
+                lines.append(f"  ... and {len(in_scope) - 5} more")
+
+        if state.scope.technologies:
+            lines.append("")
+            lines.append(f"Technologies: {', '.join(state.scope.technologies[:10])}")
+            if len(state.scope.technologies) > 10:
+                lines.append(f"  ... and {len(state.scope.technologies) - 10} more")
+
+        if state.selected_knowledge_packs:
+            lines.append(f"Knowledge Packs: {len(state.selected_knowledge_packs)}")
+
+        if state.selected_methodology_packs:
+            lines.append(f"Methodology Packs: {len(state.selected_methodology_packs)}")
+
+        if state.tasks:
+            pending = state.get_tasks_by_status(TaskStatus.PENDING)
+            completed = state.get_tasks_by_status(TaskStatus.COMPLETED)
+            failed = state.get_tasks_by_status(TaskStatus.FAILED)
+            lines.append("")
+            lines.append(f"Tasks: {len(state.tasks)} total")
+            lines.append(f"  Pending: {len(pending)}")
+            lines.append(f"  Completed: {len(completed)}")
+            lines.append(f"  Failed: {len(failed)}")
+
+        if state.evidence:
+            lines.append(f"Evidence: {len(state.evidence)} records")
+
+        lines.append("")
+        if profile:
+            lines.append(f"Estimated Duration: ~{profile.estimated_duration_minutes} minutes")
+            lines.append(f"Estimated Cost: ~${profile.estimated_cost_usd:.2f}")
+        lines.append("")
+        lines.append("=" * 60)
+        lines.append("Ready to begin active investigation.")
+        if auto_approved:
+            lines.append("(Auto-approved - continuing)")
+        else:
+            lines.append("Press ENTER to continue or Ctrl+C to abort...")
+        lines.append("=" * 60 + "\n")
+
+        summary_text = "\n".join(lines)
+
+        if not auto_approved:
+            try:
+                import click
+                click.pause(summary_text + "\n")
+            except click.Abort:
+                raise InvestigationError("Investigation cancelled by user")
+
+        return {
+            "review_displayed": True,
+            "summary_lines": len(lines),
+            "tasks_pending": len(state.get_tasks_by_status(TaskStatus.PENDING)),
+            "user_confirmed": True,
+        }
+
     # ── AI Step Handler ─────────────────────────────────────────────────────
 
     def _execute_ai_step(
@@ -811,9 +973,11 @@ class InvestigationOrchestrator:
 
         from deephunter.router.models import ModelRequest
 
+        max_tokens = min(step.config.get("max_tokens", 4096) if step.config else 4096, 16384)
+
         request = ModelRequest(
             task_type=step.task_type or "reasoning",
-            max_tokens=4096,
+            max_tokens=max_tokens,
         )
 
         template = step.prompt_template or ""
@@ -830,13 +994,30 @@ class InvestigationOrchestrator:
 
         max_context_chars = 200_000
         est_tokens = len(prompt) // 3
-        if len(prompt) > max_context_chars:
-            prompt = prompt[:max_context_chars]
-            logger.warning(
-                "AI step %s prompt truncated: ~%d tokens exceeds safe limit",
-                step.id,
-                len(prompt) // 3,
-            )
+        if est_tokens > max_tokens * 3:
+            excess_ratio = (est_tokens) / (max_tokens * 3)
+            if excess_ratio > 2:
+                head_size = len(prompt) // 3
+                tail_size = len(prompt) // 3
+                prompt = (
+                    prompt[:head_size] +
+                    f"\n\n[...CONTEXT TRUNCATED: {est_tokens - 2 * head_size} characters removed...]\n\n" +
+                    prompt[-tail_size:]
+                )
+                logger.warning(
+                    "AI step %s context heavily truncated: ~%d tokens (removed ~%d chars)",
+                    step.id,
+                    max_tokens * 3 // 3,
+                    int(excess_ratio * 100) - 100,
+                )
+            else:
+                prompt = prompt[:max_context_chars]
+                logger.warning(
+                    "AI step %s prompt truncated: ~%d tokens exceeds limit of ~%d",
+                    step.id,
+                    est_tokens,
+                    max_tokens,
+                )
 
         try:
             response = router.execute(request, prompt=prompt)
@@ -970,7 +1151,7 @@ class InvestigationOrchestrator:
                 if response.success:
                     task.status = TaskStatus.COMPLETED
                     results[task.id] = "completed"
-                    self._record_agent_findings(response.output_data, reasoning, task)
+                    self._record_agent_findings(getattr(response, 'output_data', None), reasoning, task)
                 else:
                     task.status = TaskStatus.FAILED
                     task.notes = response.error or "Agent execution failed"
@@ -986,7 +1167,7 @@ class InvestigationOrchestrator:
 
     def _record_agent_findings(
         self,
-        output_data: dict[str, Any],
+        output_data: dict[str, Any] | None,
         reasoning: Any,
         task: Task,
     ) -> None:

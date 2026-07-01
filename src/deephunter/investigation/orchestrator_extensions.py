@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from deephunter.core.config import DeepHunterConfig
-from deephunter.investigation.profiles import ExecutionProfile, get_profile
-from deephunter.investigation.profile_registry import get_profile_registry
+from deephunter.investigation.profiles import ExecutionProfile
+from deephunter.investigation.profile_registry import get_profile, get_profile_registry
 from deephunter.investigation.models import (
     InvestigationSessionState,
     InvestigationStatus,

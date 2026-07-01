@@ -43,9 +43,9 @@ class TestReportGenerator:
         state = _make_state()
         gen = ReportGenerator(state)
         report = gen.generate()
-        assert report.title == "Investigation Report: Test Investigation"
+        assert "Test Investigation" in report.title
         assert report.target == "https://example.com"
-        assert "0/0 tasks done" in report.executive_summary
+        assert "Tasks Completed:" in report.executive_summary
 
     def test_generate_with_tasks(self) -> None:
         tasks = [
@@ -56,8 +56,8 @@ class TestReportGenerator:
         state = _make_state(tasks=tasks)
         gen = ReportGenerator(state)
         report = gen.generate()
-        assert "1/3 tasks done" in report.executive_summary
-        assert "1 failed" in report.executive_summary
+        assert "**Tasks Completed:** 1/3" in report.executive_summary
+        assert "**Tasks Failed:** 1" in report.executive_summary
         assert len(report.completed_tasks) == 1
         assert report.completed_tasks[0].title == "Auth review"
 
@@ -89,7 +89,9 @@ class TestReportGenerator:
         state = _make_state(technologies=["aws", "lambda", "s3"])
         gen = ReportGenerator(state)
         report = gen.generate()
-        assert "aws, lambda, s3" in report.technology_profile
+        assert "aws" in report.technology_profile
+        assert "lambda" in report.technology_profile
+        assert "s3" in report.technology_profile
 
     def test_open_questions(self) -> None:
         tasks = [
@@ -133,7 +135,7 @@ class TestReportGenerator:
         state = _make_state()
         gen = ReportGenerator(state)
         report = gen.generate()
-        assert "Investigation started:" in report.timeline
+        assert "Investigation Started" in report.timeline
         assert "created" in report.timeline
 
     def test_references(self) -> None:
@@ -153,12 +155,12 @@ class TestReportGenerator:
         assert "Investigation Report" in md
         assert "Executive Summary" in md
         assert "Scope" in md
-        assert "Recon Summary" in md
+        assert "Reconnaissance Summary" in md
         assert "Technology Profile" in md
         assert "Attack Surface Summary" in md
         assert "Methodology Applied" in md
         assert "Investigation Timeline" in md
-        assert "Evidence" in md
+        assert "Evidence Collected" in md
         assert "Open Questions" in md
         assert "Suggested Manual Tests" in md
         assert "Draft Findings" in md

@@ -501,80 +501,167 @@ class InvestigationReport(BaseModel):
     def to_markdown(self) -> str:
         """Render the report as Markdown."""
         lines = [
-            f"# Investigation Report: {self.title}",
+            "# " + self.title,
             "",
-            f"**Target:** {self.target}",
-            f"**Generated:** {self.generated_at}",
+            "## Metadata",
             "",
+            f"- **Target:** {self.target}",
+            f"- **Generated:** {self.generated_at}",
+            f"- **Report ID:** {self.report_id if hasattr(self, 'report_id') else 'N/A'}",
+            "",
+            "---\n",
             "## Executive Summary",
             "",
-            self.executive_summary or "*No summary provided.*",
+        ]
+        exec_summary = self.executive_summary or "*No summary provided.*"
+        lines.append(exec_summary)
+
+        lines.extend([
             "",
+            "---\n",
             "## Scope",
             "",
-            self.scope_summary or "*No scope defined.*",
+        ])
+        lines.append(self.scope_summary or "*No scope defined.*")
+
+        lines.extend([
             "",
-            "## Recon Summary",
+            "---\n",
+            "## Reconnaissance Summary",
             "",
-            self.recon_summary or "*No recon data.*",
+        ])
+        lines.append(self.recon_summary or "*No recon data.*")
+
+        lines.extend([
             "",
+            "---\n",
             "## Technology Profile",
             "",
-            self.technology_profile or "*No technologies identified.*",
+        ])
+        lines.append(self.technology_profile or "*No technologies identified.*")
+
+        lines.extend([
             "",
+            "---\n",
             "## Attack Surface Summary",
             "",
-            self.attack_surface_summary or "*No attack surface data.*",
+        ])
+        lines.append(self.attack_surface_summary or "*No attack surface data.*")
+
+        lines.extend([
             "",
+            "---\n",
             "## Methodology Applied",
             "",
-            self.methodology_applied or "*No methodology selected.*",
+        ])
+        lines.append(self.methodology_applied or "*No methodology selected.*")
+
+        lines.extend([
             "",
+            "---\n",
             "## Investigation Timeline",
             "",
-            self.timeline or "*No timeline data.*",
-            "",
-            "## Evidence",
-            "",
-        ]
-        if self.evidence_summary:
-            for ev in self.evidence_summary:
-                lines.append(f"- **{ev.title}** ({ev.evidence_type.value}): {ev.content[:200]}")
-        else:
-            lines.append("*No evidence collected.*")
+        ])
+        lines.append(self.timeline or "*No timeline data.*")
 
-        lines += [
+        lines.extend([
             "",
+            "---\n",
+            "## Evidence Collected",
+            "",
+        ])
+        if self.evidence_summary:
+            by_type: dict[str, list[EvidenceRecord]] = {}
+            for ev in self.evidence_summary:
+                by_type.setdefault(ev.evidence_type.value, []).append(ev)
+
+            for ev_type, records in sorted(by_type.items()):
+                lines.append(f"### {ev_type.replace('_', ' ').title()} ({len(records)})")
+                for ev in records[:10]:
+                    content = ev.content[:300].replace("\n", " ")
+                    lines.append(f"- **{ev.title}**: {content}...")
+                if len(records) > 10:
+                    lines.append(f"  _... and {len(records) - 10} more {ev_type}_")
+                lines.append("")
+        else:
+            lines.append("*No evidence collected.*\n")
+
+        lines.extend([
+            "",
+            "---\n",
+            "## Draft Findings",
+            "",
+        ])
+        if self.draft_findings:
+            severity_order = ["critical", "high", "medium", "low", "info"]
+            by_severity: dict[str, list[dict]] = {s: [] for s in severity_order}
+            for f in self.draft_findings:
+                sev = f.get("severity", "info")
+                by_severity.setdefault(sev, []).append(f)
+
+            for sev in severity_order:
+                findings = by_severity.get(sev, [])
+                if not findings:
+                    continue
+                sev_icon = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢", "info": "⚪"}.get(sev, "⚪")
+                lines.append(f"### {sev_icon} {sev.upper()} Severity ({len(findings)})")
+                for f in findings:
+                    title = f.get("title", "Untitled")
+                    desc = f.get("description", "")[:200]
+                    category = f.get("category", "other")
+                    confidence = f.get("confidence", 0)
+                    lines.append(f"#### {title}")
+                    lines.append(f"- **Category:** {category}")
+                    lines.append(f"- **Severity:** {sev}")
+                    lines.append(f"- **Confidence:** {confidence:.0%}")
+                    if f.get("evidence_count"):
+                        lines.append(f"- **Evidence Count:** {f['evidence_count']}")
+                    if desc:
+                        lines.append(f"- **Description:** {desc}")
+                    if f.get("sample_evidence"):
+                        lines.append(f"- **Sample Evidence:** {f['sample_evidence']}...")
+                    lines.append("")
+        else:
+            lines.append("*No findings drafted.*\n")
+
+        lines.extend([
+            "",
+            "---\n",
             "## Open Questions",
             "",
-        ]
+        ])
         if self.open_questions:
             for q in self.open_questions:
                 lines.append(f"- {q}")
         else:
-            lines.append("*No open questions.*")
+            lines.append("*No open questions.*\n")
 
-        lines += [
+        lines.extend([
             "",
+            "---\n",
             "## Suggested Manual Tests",
             "",
-        ]
+        ])
         if self.suggested_manual_tests:
             for test in self.suggested_manual_tests:
                 lines.append(f"- {test}")
         else:
-            lines.append("*No manual tests suggested.*")
+            lines.append("*No manual tests suggested.*\n")
 
-        lines += [
+        if self.references:
+            lines.extend([
+                "",
+                "---\n",
+                "## References",
+                "",
+            ])
+            for ref in self.references:
+                lines.append(f"- {ref}")
+
+        lines.extend([
             "",
-            "## Draft Findings",
-            "",
-        ]
-        if self.draft_findings:
-            for f in self.draft_findings:
-                lines.append(f"- **{f.get('title', 'Untitled')}** ({f.get('severity', 'info')})")
-                lines.append(f"  {f.get('description', '')[:200]}")
-        else:
-            lines.append("*No findings drafted.*")
+            "---\n",
+            f"*Report generated by DeepHunter on {self.generated_at}*",
+        ])
 
         return "\n".join(lines)
