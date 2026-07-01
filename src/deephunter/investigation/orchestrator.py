@@ -426,7 +426,10 @@ class InvestigationOrchestrator:
         if not reasoning:
             return {"error": "No reasoning session"}
 
-        for target in [state.scope.target] + [e.value for e in state.in_scope]:
+        for target in [state.scope.target] + [
+            e.value for e in state.scope.entries
+            if e.entry_type == ScopeEntryType.IN_SCOPE
+        ]:
             obs = reasoning.create_observation(
                 obs_type="endpoint",
                 description=f"In-scope target: {target}",
@@ -475,15 +478,52 @@ class InvestigationOrchestrator:
     def _handle_build_graph(
         self, state: InvestigationSessionState, _step: WorkflowStepDefinition
     ) -> dict[str, Any]:
+        reasoning = self.get_reasoning_session(state)
+        graph_nodes = 0
+        for entry in state.scope.entries:
+            if reasoning:
+                reasoning.create_observation(
+                    obs_type="endpoint",
+                    description=f"Attack surface entry: {entry.value} ({entry.entry_type.value})",
+                    source="workflow:build_attack_surface_graph",
+                    tags=["attack_surface", entry.entry_type.value],
+                )
+            graph_nodes += 1
+
+        for tech in state.scope.technologies:
+            if reasoning:
+                reasoning.create_observation(
+                    obs_type="technology",
+                    description=f"Technology in attack surface: {tech}",
+                    source="workflow:build_attack_surface_graph",
+                    tags=["technology", tech.lower()],
+                )
+
         state.status = InvestigationStatus.GRAPH_BUILT
-        return {"graph_built": True, "nodes": len(state.scope.entries)}
+        return {
+            "graph_built": True,
+            "nodes": graph_nodes,
+            "technologies": len(state.scope.technologies),
+        }
 
     def _handle_identify_technologies(
         self, state: InvestigationSessionState, _step: WorkflowStepDefinition
     ) -> dict[str, Any]:
         reasoning = self.get_reasoning_session(state)
+        detected: list[str] = list(state.scope.technologies)
+
+        if not detected:
+            in_scope_urls = [e.value for e in state.scope.entries if e.entry_type == ScopeEntryType.IN_SCOPE]
+            for url in in_scope_urls:
+                if not url.startswith(("http://", "https://")):
+                    url = f"https://{url}"
+                detected = self._detect_technologies(url)
+                if detected:
+                    break
+
+        state.scope.technologies = detected
         if reasoning:
-            for tech in state.scope.technologies:
+            for tech in detected:
                 reasoning.create_observation(
                     obs_type="technology",
                     description=f"Identified technology: {tech}",
@@ -492,6 +532,112 @@ class InvestigationOrchestrator:
                 )
         state.status = InvestigationStatus.TECHNOLOGIES_IDENTIFIED
         return {"technologies": state.scope.technologies}
+
+    def _detect_technologies(self, url: str) -> list[str]:
+        technologies: set[str] = set()
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={"User-Agent": "DeepHunter/1.0"}, method="GET")
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                headers = {k.lower(): v for k, v in resp.headers.items()}
+                self._detect_from_headers(headers, technologies)
+
+                if resp.headers.get_content_type() in ("text/html", "application/xhtml+xml"):
+                    try:
+                        body = resp.read(65536).decode("utf-8", errors="ignore")
+                        self._detect_from_html(body, technologies)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        return sorted(technologies)
+
+    def _detect_from_headers(self, headers: dict[str, str], technologies: set[str]) -> None:
+        server = headers.get("server", "").lower()
+        powered_by = headers.get("x-powered-by", "").lower()
+        via = headers.get("via", "").lower()
+
+        if not server and not powered_by and not via:
+            return
+
+        if "apache" in server:
+            technologies.add("Apache")
+        if "nginx" in server:
+            technologies.add("Nginx")
+        if "iis" in server or "microsoft-iis" in server:
+            technologies.add("IIS")
+        if "litespeed" in server:
+            technologies.add("LiteSpeed")
+        if "nodejs" in server or "node" in server:
+            technologies.add("Node.js")
+
+        if "php" in powered_by:
+            technologies.add("PHP")
+        if "asp.net" in powered_by:
+            technologies.add("ASP.NET")
+        if "express" in powered_by:
+            technologies.add("Express")
+        if "django" in powered_by:
+            technologies.add("Django")
+        if "rails" in powered_by or "ruby" in powered_by:
+            technologies.add("Ruby on Rails")
+        if "laravel" in powered_by:
+            technologies.add("Laravel")
+        if "spring" in powered_by:
+            technologies.add("Spring")
+        if "fastapi" in powered_by:
+            technologies.add("FastAPI")
+        if "flask" in powered_by:
+            technologies.add("Flask")
+
+        if "cloudflare" in via:
+            technologies.add("Cloudflare")
+
+    def _detect_from_html(self, html: str, technologies: set[str]) -> None:
+        html_lower = html.lower()
+        if "wp-content" in html_lower or "wordpress" in html_lower:
+            technologies.add("WordPress")
+        if "drupal" in html_lower:
+            technologies.add("Drupal")
+        if "joomla" in html_lower:
+            technologies.add("Joomla")
+        if "wp-json" in html_lower or 'rel="https://api.w.org"' in html_lower:
+            technologies.add("WordPress")
+        if "react" in html_lower and ("reactjs" in html_lower or "react.js" in html_lower):
+            technologies.add("React")
+        if "vue" in html_lower and (".vue" in html_lower or "vuejs" in html_lower):
+            technologies.add("Vue.js")
+        if "angular" in html_lower:
+            technologies.add("Angular")
+        if "next.js" in html_lower or '__next' in html_lower:
+            technologies.add("Next.js")
+        if "nuxt" in html_lower:
+            technologies.add("Nuxt.js")
+        if "jquery" in html_lower:
+            technologies.add("jQuery")
+        if "bootstrap" in html_lower:
+            technologies.add("Bootstrap")
+        if "tailwind" in html_lower:
+            technologies.add("Tailwind CSS")
+        if "<form" in html_lower and "django" in html_lower:
+            technologies.add("Django")
+        if "flask" in html_lower:
+            technologies.add("Flask")
+        if "laravel" in html_lower:
+            technologies.add("Laravel")
+        if "symfony" in html_lower:
+            technologies.add("Symfony")
+        if "spring" in html_lower:
+            technologies.add("Spring")
+        if "wp-admin" in html_lower:
+            technologies.add("WordPress")
+        if "cdn.tail" in html_lower or "tailwindcss" in html_lower:
+            technologies.add("Tailwind CSS")
+        if "_nuxt" in html_lower:
+            technologies.add("Nuxt.js")
+        if "__NEXT_DATA__" in html_lower:
+            technologies.add("Next.js")
 
     def _handle_select_knowledge_packs(
         self, state: InvestigationSessionState, _step: WorkflowStepDefinition
@@ -670,10 +816,27 @@ class InvestigationOrchestrator:
             max_tokens=4096,
         )
 
-        prompt = (step.prompt_template or "").replace("{target}", state.target)
+        template = step.prompt_template or ""
+        substitutions = {
+            "target": state.target,
+            "technologies": ", ".join(state.scope.technologies) if state.scope.technologies else "unknown",
+            "scope": ", ".join(e.value for e in state.scope.entries) if state.scope.entries else state.target,
+        }
+        for var, val in substitutions.items():
+            template = template.replace(f"{{{{{var}}}}}", val)
+            template = template.replace(f"{{{var}}}", val)
 
-        if not prompt:
-            prompt = f"Analyze {state.target} for investigation step: {step.name or step.id}"
+        prompt = template.strip() or f"Analyze {state.target} for investigation step: {step.name or step.id}"
+
+        max_context_chars = 200_000
+        est_tokens = len(prompt) // 3
+        if len(prompt) > max_context_chars:
+            prompt = prompt[:max_context_chars]
+            logger.warning(
+                "AI step %s prompt truncated: ~%d tokens exceeds safe limit",
+                step.id,
+                len(prompt) // 3,
+            )
 
         try:
             response = router.execute(request, prompt=prompt)
@@ -848,14 +1011,14 @@ class InvestigationOrchestrator:
             return
 
         summary = f"Task '{task.title}' findings:\n" + "\n".join(content_lines)
-        reasoning.create_observation(
+        obs = reasoning.create_observation(
             obs_type="finding",
             description=f"Agent finding from {task.category.value} investigation: {task.title}",
             source=f"agent:{task.category.value}",
             tags=["finding", task.category.value, "agent"],
         )
         reasoning.add_evidence(
-            observation_id=None,
+            observation_id=obs.id,
             content=summary,
             source=f"agent:{task.category.value}",
             ev_type="finding",

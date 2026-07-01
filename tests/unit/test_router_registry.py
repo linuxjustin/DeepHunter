@@ -57,7 +57,7 @@ class FakeProvider(ModelProvider):
     def is_available(self) -> ProviderStatus:
         return ProviderStatus.AVAILABLE
 
-    def generate(self, prompt, system_prompt=None, temperature=None, max_tokens=None, model=None):
+    def generate(self, prompt, system_prompt=None, temperature=None, max_tokens=None, model=None, tools=None):
         from deephunter.router.models import ModelResponse
         return ModelResponse(
             content=f"Response from {self._name}",

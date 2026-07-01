@@ -6,6 +6,7 @@ Claude 3.5 Haiku, etc.) with streaming, JSON mode, and tool calling.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Generator
 from typing import Any
 
@@ -120,7 +121,7 @@ class ClaudeProvider(LLMProvider):
                 tool_calls.append({
                     "id": block.id,
                     "type": "function",
-                    "function": {"name": block.name, "arguments": str(block.input)},
+                    "function": {"name": block.name, "arguments": json.dumps(block.input)},
                 })
 
         return LLMResponse(

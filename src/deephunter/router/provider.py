@@ -59,6 +59,7 @@ class ModelProvider(ABC):
         temperature: float | None = None,
         max_tokens: int | None = None,
         model: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
     ) -> ModelResponse:
         """Generate a response from the provider.
 
@@ -148,15 +149,23 @@ class LegacyProviderAdapter(ModelProvider):
         temperature: float | None = None,
         max_tokens: int | None = None,
         model: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
     ) -> ModelResponse:
         messages: list[LLMMessage] = []
         if system_prompt:
             messages.append(LLMMessage(role="system", content=system_prompt))
         messages.append(LLMMessage(role="user", content=prompt))
+
+        tool_defs = None
+        if tools:
+            from deephunter.llm.base import ToolDefinition
+            tool_defs = [ToolDefinition(name=t["name"], description=t.get("description", ""), parameters=t.get("parameters", {})) for t in tools]
+
         llm_response: LLMResponse = self._provider.generate(
             messages,
             temperature=temperature,
             max_tokens=max_tokens,
+            tools=tool_defs,
         )
         return ModelResponse(
             content=llm_response.content,

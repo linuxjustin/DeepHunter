@@ -80,7 +80,7 @@ steps:
     task_type: reasoning
     prompt_template: "Analyze the attack surface of {target} and identify the most promising bug classes to investigate based on the technologies identified."
     depends_on:
-      - build_graph
+      - select_knowledge_packs
 
   - id: manual_approval
     name: Manual Approval

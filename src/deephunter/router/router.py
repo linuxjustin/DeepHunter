@@ -207,6 +207,7 @@ class ModelRouter:
         system_prompt: str | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
+        tools: list[dict[str, Any]] | None = None,
     ) -> ModelResponse:
         """Route a request AND execute it against the selected provider.
 
@@ -216,6 +217,7 @@ class ModelRouter:
             system_prompt: Optional system instruction.
             temperature: Sampling temperature.
             max_tokens: Maximum tokens to generate.
+            tools: Optional tool definitions to pass to the model.
 
         Returns:
             A ModelResponse with content and routing metadata.
@@ -225,46 +227,48 @@ class ModelRouter:
         """
         decision = self.route(request)
 
-        provider = self._registry.get(decision.provider_name)
-        if provider is None:
-            raise RouterError(
-                f"Provider '{decision.provider_name}' was selected but is no longer registered"
-            )
+        provider_names = [decision.provider_name] + list(decision.fallback_chain)
+        last_exc: Exception | None = None
 
-        try:
-            response = provider.generate(
-                prompt=prompt,
-                system_prompt=system_prompt,
-                temperature=temperature,
-                max_tokens=max_tokens or request.max_tokens,
-                model=decision.model_name,
-            )
-        except Exception as exc:
-            self._event_bus.emit(ProviderFailedEvent(
-                request_id=request.id,
-                provider_name=decision.provider_name,
-                model_name=decision.model_name,
-                error=str(exc),
-            ))
-            raise RouterError(
-                f"Provider '{decision.provider_name}' execution failed: {exc}"
-            ) from exc
+        for provider_name in provider_names:
+            provider = self._registry.get(provider_name)
+            if provider is None:
+                continue
 
-        response.request_id = request.id
-        response.routing_decision = decision
+            try:
+                response = provider.generate(
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens or request.max_tokens,
+                    model=decision.model_name,
+                    tools=tools,
+                )
+                response.request_id = request.id
+                response.routing_decision = decision
+                self._metrics.successful_routes += 1
+                self._metrics.model_counts[decision.model_name] = (
+                    self._metrics.model_counts.get(decision.model_name, 0) + 1
+                )
+                self._event_bus.emit(RouteCompletedEvent(
+                    request_id=request.id,
+                    provider_name=provider_name,
+                    model_name=decision.model_name,
+                ))
+                return response
+            except Exception as exc:
+                last_exc = exc
+                self._event_bus.emit(ProviderFailedEvent(
+                    request_id=request.id,
+                    provider_name=provider_name,
+                    model_name=decision.model_name,
+                    error=str(exc),
+                ))
+                continue
 
-        self._metrics.successful_routes += 1
-        self._metrics.model_counts[decision.model_name] = (
-            self._metrics.model_counts.get(decision.model_name, 0) + 1
-        )
-
-        self._event_bus.emit(RouteCompletedEvent(
-            request_id=request.id,
-            provider_name=decision.provider_name,
-            model_name=decision.model_name,
-        ))
-
-        return response
+        raise RouterError(
+            f"All providers failed. Last error: {last_exc}"
+        ) from last_exc
 
     # ── Internal ─────────────────────────────────────────────────
 

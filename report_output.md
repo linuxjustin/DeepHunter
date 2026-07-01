@@ -1,11 +1,11 @@
 # Investigation Report: Investigation Report: Investigation: https://example.com
 
 **Target:** https://example.com
-**Generated:** 2026-07-01T05:47:28.012697+00:00
+**Generated:** 2026-07-01T07:10:21.348516+00:00
 
 ## Executive Summary
 
-Investigation of https://example.com completed (0/289 tasks done, 289 failed, 6 evidence records collected, 0 draft findings).
+Investigation of https://example.com completed (0/289 tasks done, 289 failed, 9 evidence records collected, 0 draft findings).
 
 ## Scope
 
@@ -18,9 +18,12 @@ Investigation of https://example.com completed (0/289 tasks done, 289 failed, 6 
 
 ## Recon Summary
 
-**Recon Artifacts:** 6
+**Recon Artifacts:** 9
 - In-scope target: https://example.com: In-scope target: https://example.com
 - In-scope target: https://example.com: In-scope target: https://example.com
+- Attack surface entry: https://example.com (in_scope): Attack surface entry: https://example.com (in_scope)
+- Technology in attack surface: node.js: Technology in attack surface: node.js
+- Technology in attack surface: express: Technology in attack surface: express
 - Identified technology: node.js: Identified technology: node.js
 - Identified technology: express: Identified technology: express
 - Evidence: Target https://example.com is in scope for investigation: Target https://example.com is in scope for investigation
@@ -32,7 +35,7 @@ Investigation of https://example.com completed (0/289 tasks done, 289 failed, 6 
 
 ## Attack Surface Summary
 
-**Observations collected:** 6 evidence records across 289 tasks.
+**Observations collected:** 9 evidence records across 289 tasks.
 
 ## Methodology Applied
 
@@ -40,7 +43,7 @@ Investigation of https://example.com completed (0/289 tasks done, 289 failed, 6 
 
 ## Investigation Timeline
 
-Investigation started: 2026-07-01T05:47:27.974894+00:00
+Investigation started: 2026-07-01T07:10:21.308524+00:00
 Current status: in_progress
 Steps completed: 14
 Tasks created: 289
@@ -49,6 +52,9 @@ Tasks created: 289
 
 - **In-scope target: https://example.com** (observation): In-scope target: https://example.com
 - **In-scope target: https://example.com** (observation): In-scope target: https://example.com
+- **Attack surface entry: https://example.com (in_scope)** (observation): Attack surface entry: https://example.com (in_scope)
+- **Technology in attack surface: node.js** (observation): Technology in attack surface: node.js
+- **Technology in attack surface: express** (observation): Technology in attack surface: express
 - **Identified technology: node.js** (observation): Identified technology: node.js
 - **Identified technology: express** (observation): Identified technology: express
 - **Evidence: Target https://example.com is in scope for investigation** (http_response): Target https://example.com is in scope for investigation

@@ -90,6 +90,7 @@ class ModelRequest(BaseModel):
     require_tool_use: bool = False
     preferred_providers: list[str] = Field(default_factory=list)
     excluded_providers: list[str] = Field(default_factory=list)
+    tools: list[dict[str, Any]] = Field(default_factory=list, description="Tool definitions to pass to the model")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     def to_execution_context(self) -> ExecutionContext:

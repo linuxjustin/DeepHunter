@@ -691,6 +691,68 @@ def init(target: str, output: str) -> None:
 
 
 @investigate.command()
+@click.argument("session_path", type=click.Path(exists=True))
+def status(session_path: str) -> None:
+    """Show the status of a saved investigation session."""
+    from deephunter.investigation.orchestrator import InvestigationOrchestrator
+    from deephunter.planning.models import TaskStatus
+    from deephunter.investigation.models import InvestigationStatus
+
+    orch = InvestigationOrchestrator()
+    state, _ = orch.resume(session_path)
+
+    console.print(f"[bold]Investigation:[/bold] {state.name or state.target}")
+    console.print(f"[bold]Target:[/bold] {state.target}")
+    console.print(f"[bold]Status:[/bold] [{_status_color(state.status)}]{state.status.value}[/]")
+    console.print(f"[bold]Session:[/bold] {state.session_id}")
+
+    if state.completed_steps:
+        console.print(f"\n[bold green]Completed steps ({len(state.completed_steps)}):[/bold green]")
+        for step_id in state.completed_steps:
+            console.print(f"  ✅ {step_id}")
+
+    pending_steps = [s for s in (state.workflow.steps if state.workflow else []) if s.id not in state.completed_steps]
+    if pending_steps:
+        console.print(f"\n[bold yellow]Pending steps ({len(pending_steps)}):[/bold yellow]")
+        for step in pending_steps:
+            console.print(f"  ⏳ {step.id}")
+
+    if state.tasks:
+        task_table = Table(title="Investigation Tasks")
+        task_table.add_column("Title")
+        task_table.add_column("Priority", style="cyan")
+        task_table.add_column("Status", style="magenta")
+        for t in state.tasks:
+            status_color = _task_status_color(t.status)
+            task_table.add_row(t.title, t.priority.name, f"[{status_color}]{t.status.value}[/]")
+        console.print(f"\n[bold]Tasks ({len(state.tasks)}):[/bold]")
+        console.print(task_table)
+
+    if state.scope.technologies:
+        console.print(f"\n[bold]Technologies:[/bold] {', '.join(state.scope.technologies)}")
+
+
+def _status_color(status: InvestigationStatus) -> str:
+    if status == InvestigationStatus.COMPLETED:
+        return "green"
+    if status == InvestigationStatus.FAILED:
+        return "red"
+    if status == InvestigationStatus.IN_PROGRESS:
+        return "yellow"
+    return "cyan"
+
+
+def _task_status_color(status: TaskStatus) -> str:
+    if status == TaskStatus.COMPLETED:
+        return "green"
+    if status == TaskStatus.FAILED:
+        return "red"
+    if status == TaskStatus.IN_PROGRESS:
+        return "yellow"
+    return "cyan"
+
+
+@investigate.command()
 def list_workflows() -> None:
     """List available YAML workflow definitions."""
     from deephunter.investigation.orchestrator import InvestigationOrchestrator
