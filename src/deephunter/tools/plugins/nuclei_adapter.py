@@ -49,17 +49,23 @@ class NucleiAdapter(BaseToolPlugin):
             )
             return proc.stdout
         except subprocess.TimeoutExpired:
-            return None
+            return "nuclei: timeout exceeded"
 
     def parse_output(self, raw: str | bytes | None, context: ExecutionContext) -> list[dict[str, Any]]:
         if not raw:
             return []
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8", errors="replace")
+        if "timeout" in raw.lower():
+            return [{"__error__": "timeout"}]
         return parse_ndjson(raw, {})
 
     def normalize(self, parsed: list[dict[str, Any]], context: ExecutionContext) -> PluginResult:
         result = PluginResult()
+        if parsed and any(item.get("__error__") for item in parsed):
+            result.success = False
+            result.error = "nuclei scan timed out"
+            return result
         seen_hosts: dict[str, Host] = {}
         seen_findings: set[str] = set()
 

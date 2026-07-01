@@ -781,6 +781,7 @@ class InvestigationOrchestrator:
         Maps task categories to workflow agents and executes them.
         """
         orchestrator = _get_orchestrator_v2()
+        reasoning = self.get_reasoning_session(state)
         from deephunter.agents.context import AgentExecutionContext
 
         tasks_to_run = [
@@ -799,11 +800,14 @@ class InvestigationOrchestrator:
                     "target": state.target,
                     "task_id": task.id,
                     "task_title": task.title,
+                    "task_description": task.description,
+                    "task_category": task.category.value,
                 })
                 response = orchestrator.execute(agent_name, ctx)
                 if response.success:
                     task.status = TaskStatus.COMPLETED
                     results[task.id] = "completed"
+                    self._record_agent_findings(response.output_data, reasoning, task)
                 else:
                     task.status = TaskStatus.FAILED
                     task.notes = response.error or "Agent execution failed"
@@ -816,6 +820,46 @@ class InvestigationOrchestrator:
             task.updated_at = datetime.now(UTC).isoformat()
 
         return results
+
+    def _record_agent_findings(
+        self,
+        output_data: dict[str, Any],
+        reasoning: Any,
+        task: Task,
+    ) -> None:
+        """Extract findings from agent output and record as observations."""
+        if not reasoning or not output_data:
+            return
+
+        content_lines: list[str] = []
+
+        if isinstance(output_data, dict):
+            for key, value in output_data.items():
+                if key in ("result", "data"):
+                    continue
+                if isinstance(value, list) and value:
+                    content_lines.append(f"{key}: {len(value)} item(s)")
+                elif isinstance(value, str) and value:
+                    content_lines.append(f"{key}: {value[:200]}")
+                elif value:
+                    content_lines.append(f"{key}: {str(value)[:200]}")
+
+        if not content_lines:
+            return
+
+        summary = f"Task '{task.title}' findings:\n" + "\n".join(content_lines)
+        reasoning.create_observation(
+            obs_type="finding",
+            description=f"Agent finding from {task.category.value} investigation: {task.title}",
+            source=f"agent:{task.category.value}",
+            tags=["finding", task.category.value, "agent"],
+        )
+        reasoning.add_evidence(
+            observation_id=None,
+            content=summary,
+            source=f"agent:{task.category.value}",
+            ev_type="finding",
+        )
 
     def get_pending_tasks(self, state: InvestigationSessionState) -> list[Task]:
         """Get all pending tasks, sorted by priority."""
@@ -1001,6 +1045,17 @@ class InvestigationOrchestrator:
             TaskCategory.API: "api_review",
             TaskCategory.CLOUD: "cloud_review",
             TaskCategory.RECON: "initial_recon",
+            TaskCategory.SESSION: "auth_review",
+            TaskCategory.GRAPHQL: "api_review",
+            TaskCategory.SQL_INJECTION: "api_review",
+            TaskCategory.XSS: "api_review",
+            TaskCategory.SSRF: "api_review",
+            TaskCategory.RCE: "api_review",
+            TaskCategory.LFI: "api_review",
+            TaskCategory.IDOR: "api_review",
+            TaskCategory.FILE_UPLOAD: "api_review",
+            TaskCategory.RATE_LIMIT: "api_review",
+            TaskCategory.OTHER: "initial_recon",
         }
         return mapping.get(category, "initial_recon")
 

@@ -143,7 +143,7 @@ class PrioritizeStepsStage(PlanningStage):
                 step.risk,
                 complexity=step.complexity,
                 effort_hours=step.estimated_cost_hours,
-                reward=step.priority_score,
+                reward=0.5,
             )
             if abs(step.priority_score - old) > 0.01:
                 event_bus.emit(

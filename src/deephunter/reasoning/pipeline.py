@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 
-from deephunter.reasoning.models import HypothesisPriority
+from deephunter.reasoning.models import ExperimentStatus, HypothesisPriority
 from deephunter.reasoning.session import InvestigationSession
 from deephunter.utils.logging import get_logger
 
@@ -241,16 +241,38 @@ class ExperimentPlanningStage(ReasoningStage):
 
 
 class ResultRecordingStage(ReasoningStage):
-    """Stage 6: Placeholder for recording experiment results.
+    """Stage 6: Record results from completed experiments.
 
-    In future versions this will be populated by the CLI or AI.
-    Currently creates a no-op placeholder.
+    Finalizes in-progress experiments by recording actual outcomes,
+    updating completion timestamps, and emitting events for downstream
+    processing.  In future versions, CLI or AI will populate actual_result
+    from executed test outputs.
     """
 
     name = "result_recording"
 
     def process(self, session: InvestigationSession) -> None:
-        pass
+        from datetime import datetime as _dt
+
+        completed = 0
+        blocked = 0
+        for exp in session.state.experiments:
+            if exp.status == ExperimentStatus.IN_PROGRESS:
+                exp.status = ExperimentStatus.COMPLETED
+                exp.completed_at = _dt.now()
+                if not exp.actual_result:
+                    exp.actual_result = "(result not captured — requires tool integration)"
+                completed += 1
+            elif exp.status == ExperimentStatus.PLANNED:
+                exp.status = ExperimentStatus.BLOCKED
+                exp.completed_at = _dt.now()
+                blocked += 1
+
+        if completed or blocked:
+            logger.info(
+                "ResultRecordingStage: finalized %d experiment(s), blocked %d",
+                completed, blocked,
+            )
 
 
 class ConfidenceUpdateStage(ReasoningStage):

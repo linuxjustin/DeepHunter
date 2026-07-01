@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from deephunter.recon.plugin import PluginResult
 from deephunter.tools.base import BaseToolPlugin
 from deephunter.tools.context import ExecutionContext
@@ -54,6 +52,7 @@ class SubfinderPlugin(BaseToolPlugin):
         from deephunter.recon.models import Host, HostStatus, Protocol, ReconSourceType
 
         result = PluginResult()
+        result.success = True
         for hostname in parsed:
             host = Host(
                 hostname=hostname,

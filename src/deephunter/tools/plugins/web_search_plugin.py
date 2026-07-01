@@ -61,8 +61,12 @@ class WebSearchPlugin(BaseToolPlugin):
 
     def normalize(self, parsed: Any, context: ExecutionContext) -> PluginResult:
         result = PluginResult()
-        result.success = True
-        result.raw_output = parsed if isinstance(parsed, str) else str(parsed)
+        if isinstance(parsed, str) and parsed.startswith("Search failed:"):
+            result.success = False
+            result.error = parsed
+        else:
+            result.success = True
+            result.raw_output = parsed if isinstance(parsed, str) else str(parsed)
         return result
 
     def health(self, context: ExecutionContext) -> PluginHealth:
