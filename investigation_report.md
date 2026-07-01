@@ -1,0 +1,973 @@
+# Bug Bounty Investigation Report: Investigation: vtiger.com
+
+## Metadata
+
+- **Target:** vtiger.com
+- **Generated:** 2026-07-01T18:52:29.782016+00:00
+- **Report ID:** N/A
+
+---
+
+## Executive Summary
+
+This report documents the security investigation of **vtiger.com** performed using DeepHunter.
+
+**Investigation Status:** completed
+**Session ID:** inv-6a6781662a77
+
+### Key Metrics
+- **Tasks Completed:** 0/289
+- **Tasks Failed:** 0
+- **Tasks Pending:** 289
+- **Evidence Records:** 0
+- **Draft Findings:** 0
+
+This investigation used 0 knowledge packs and 0 methodology packs.
+
+---
+
+## Scope
+
+**Primary Target:** vtiger.com
+
+### In Scope (1 entries)
+- `vtiger.com`
+
+---
+
+## Reconnaissance Summary
+
+No reconnaissance data collected during this investigation.
+
+---
+
+## Technology Profile
+
+No technologies were identified during this investigation.
+
+---
+
+## Attack Surface Summary
+
+No attack surface data was collected during this investigation.
+
+---
+
+## Methodology Applied
+
+No methodology packs were selected for this investigation.
+
+---
+
+## Investigation Timeline
+
+| Event | Details |
+|--------|---------|
+| Investigation Started | 2026-07-01T18:52:29.570059+00:00 |
+| Current Status | completed |
+| Last Updated | 2026-07-01T18:52:29.780284+00:00 |
+| Session ID | inv-6a6781662a77 |
+| Steps Completed | 3 |
+|   - scope | completed |
+|   - plan | completed |
+|   - report | completed |
+
+| Tasks Total | 289 |
+| Tasks Completed | 0 |
+| Tasks Failed | 0 |
+| Tasks Pending | 289 |
+
+---
+
+## Evidence Collected
+
+*No evidence collected.*
+
+
+---
+
+## Draft Findings
+
+*No findings drafted.*
+
+
+---
+
+## Open Questions
+
+- 🟡 **[HIGH]** Target Reconnaissance (recon)
+- 🟡 **[HIGH]** [Microservices] Test service discovery and registry exposure (recon)
+- 🟡 **[HIGH]** [SSRF] Test blind SSRF with OOB techniques (ssrf)
+- 🟡 **[HIGH]** Authentication (authentication)
+- 🟡 **[HIGH]** Authorization (authorization)
+- 🟡 **[HIGH]** Input Validation (other)
+- 🟡 **[HIGH]** Session Management (session)
+- 🟡 **[HIGH]** Configuration (other)
+- 🟡 **[HIGH]** [jwt] Knowledge Pack Analysis (authentication)
+- 🟡 **[HIGH]** [oauth] Knowledge Pack Analysis (authentication)
+- 🟡 **[HIGH]** [oidc] Knowledge Pack Analysis (authentication)
+- 🟡 **[HIGH]** [saml] Knowledge Pack Analysis (authentication)
+- 🟡 **[HIGH]** [Session Management] Analyze session cookie attributes (authentication)
+- 🟡 **[HIGH]** [Session Management] Test session fixation (authentication)
+- 🟡 **[HIGH]** [Session Management] Test concurrent session handling (authentication)
+- 🟡 **[HIGH]** [Session Management] Test session termination (authentication)
+- 🟡 **[HIGH]** [Session Management] Test session hijacking via token leakage (authentication)
+- 🟡 **[HIGH]** [REST API] Test API authentication bypass (authentication)
+- 🟡 **[HIGH]** [OIDC] Test SSO logout security (authentication)
+- 🟡 **[HIGH]** [JWT] Test JWT claim manipulation (authentication)
+- 🟡 **[HIGH]** [JWT] Test JWT token lifecycle (authentication)
+- 🟡 **[HIGH]** [Session Management] Test session token entropy (authentication)
+- 🟡 **[HIGH]** [Microservices] Test inter-service authentication (authentication)
+- 🟡 **[HIGH]** [Race Conditions] Test session race conditions and fixation (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 1: 1. Capture a JWT token from the application (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 2: 2. Decode the JWT to inspect header and payload claims (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 3: 3. Test alg=none: modify header to {'alg':'none'} and empty  (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 4: 4. Fetch server's public key from /.well-known/jwks.json (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 5: 5. Test RS256->HS256 confusion using public key for HMAC (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 6: 6. Brute-force weak HMAC secret using jwt_tool or hashcat (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 7: 7. Test kid injection with path traversal and SQLi payloads (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 8: 8. Set jku/jwk header to attacker-controlled URL for SSRF (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 9: 9. Modify sub claim to impersonate other users (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 10: 10. Check for presence of exp, nbf, aud, iss claims (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 11: 11. Check if token appears in URL query parameters (authentication)
+- 🟡 **[HIGH]** [jwt] Workflow 12: 12. Send request with stripped/modified signature (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 1: 1. Discover OAuth endpoints via /.well-known/oauth-authoriza (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 2: 2. Identify OAuth flow type (authorization code, implicit, c (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 3: 3. Test CSRF by initiating flow without state parameter (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 4: 4. Fuzz redirect_uri with open redirect payloads (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 5: 5. Check Referrer header for token leakage after callback (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 6: 6. Attempt PKCE downgrade by modifying code_challenge_method (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 7: 7. Escalate scope by adding privileged scopes (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 8: 8. Search for client_secret in source code, config files, an (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 9: 9. Intercept and modify authorization code during exchange (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 10: 10. Test token endpoint for missing client authentication (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 11: 11. Test refresh token reuse and rotation (authentication)
+- 🟡 **[HIGH]** [oauth] Workflow 12: 12. Check for auto-approved consent without user interaction (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 1: 1. Discover OIDC provider configuration via /.well-known/ope (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 2: 2. Identify supported response types, scopes, claims, and ac (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 3: 3. Capture ID token and validate nonce handling/replay prote (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 4: 4. Test acr_values manipulation to weaken authentication (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 5: 5. Validate ID token aud, iss, exp, and signature verificati (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 6: 6. Swap aud claim to test audience confusion (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 7: 7. Test bearer token interception through redirect URI fuzzi (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 8: 8. Analyze hybrid flow tokens for JWS/JWE confusion attacks (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 9: 9. Test UserInfo endpoint with stolen or invalid access toke (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 10: 10. Attempt authorization code injection at token endpoint (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 11: 11. Test session management via id_token_hint and end_sessio (authentication)
+- 🟡 **[HIGH]** [oidc] Workflow 12: 12. Check for CBC padding oracle in JWE encrypted tokens (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 1: 1. Discover SAML endpoints (/saml/acs, /saml/login, /saml/me (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 2: 2. Fetch SP/IdP metadata XML from /saml/metadata (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 3: 3. Capture a valid SAMLResponse from the ACS endpoint (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 4: 4. Test XML signature wrapping by inserting duplicate elemen (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 5: 5. Inject additional Assertion elements into the response (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 6: 6. Modify attribute statements (role, email, uid) in the ass (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 7: 7. Spoof the Issuer element to a different trusted IdP (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 8: 8. Remove or modify AudienceRestriction for cross-SP use (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 9: 9. Remove NotOnOrAfter condition for replay attack (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 10: 10. Test XXE injection in SAML XML documents (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 11: 11. Modify Destination attribute in the Response (authentication)
+- 🟡 **[HIGH]** [saml] Workflow 12: 12. Modify SubjectConfirmation method or data (authentication)
+- 🟡 **[HIGH]** Authorization Testing (authorization)
+- 🟡 **[HIGH]** [GraphQL] Test field-level authorization (authorization)
+- 🟡 **[HIGH]** [GraphQL] Test GraphQL mutation authorization (authorization)
+- 🟡 **[HIGH]** [REST API] Test IDOR and authorization on API resources (authorization)
+- 🟡 **[HIGH]** [OAuth] Test authorization code interception (authorization)
+- 🟡 **[HIGH]** [Cloud Review] Review IAM/cloud permission configuration (authorization)
+- 🟡 **[HIGH]** [Race Conditions] Test race conditions in authentication and authorization (authentication)
+- 🟡 **[HIGH]** [Business Logic] Test multi-step workflow bypass (business_logic)
+- 🟡 **[HIGH]** [Business Logic] Test privilege tier/role escalation via logic (business_logic)
+- 🟡 **[HIGH]** [Business Logic] Test mass assignment/parameter manipulation in logic operations (business_logic)
+- 🟡 **[HIGH]** [Race Conditions] Identify state-changing operations vulnerable to race conditions (business_logic)
+- 🟡 **[HIGH]** [Business Logic] Test race conditions (business_logic)
+- 🟡 **[HIGH]** [Race Conditions] Test race conditions with concurrent requests (business_logic)
+- 🟡 **[HIGH]** [Race Conditions] Test race conditions in financial operations (business_logic)
+- 🟡 **[HIGH]** [JWT] Test algorithm confusion (alg=none) (other)
+- 🟡 **[HIGH]** [Microservices] Test distributed tracing exposure (other)
+- 🟡 **[HIGH]** [Command Injection] Identify command injection entry points (other)
+- 🟡 **[HIGH]** [Command Injection] Test basic command injection with metacharacters (other)
+- 🟡 **[HIGH]** [SSRF] Identify SSRF entry points (ssrf)
+- 🟡 **[HIGH]** [REST API] Test content-type negotiation and deserialization (api)
+- 🟡 **[HIGH]** [OAuth] Test CSRF via state parameter (other)
+- 🟡 **[HIGH]** [OAuth] Test PKCE implementation (other)
+- 🟡 **[HIGH]** [OAuth] Test token leakage via various channels (other)
+- 🟡 **[HIGH]** [OAuth] Test client credentials grant security (other)
+- 🟡 **[HIGH]** [OIDC] Test token confusion (access token vs ID token) (other)
+- 🟡 **[HIGH]** [JWT] Test RS256 to HS256 key confusion (other)
+- 🟡 **[HIGH]** [JWT] Test weak HMAC secret brute force (rce)
+- 🟡 **[HIGH]** [Session Management] Test CSRF token implementation (session)
+- 🟡 **[HIGH]** [File Upload] Test extension validation bypass (other)
+- 🟡 **[HIGH]** [File Upload] Test MIME type/content-type validation (other)
+- 🟡 **[HIGH]** [Business Logic] Test integer/currency manipulation (other)
+- 🟡 **[HIGH]** [Business Logic] Test coupon/discount abuse (other)
+- 🟡 **[HIGH]** [Business Logic] Test rate limiting circumvention (other)
+- 🟡 **[HIGH]** [Cloud Review] Review container/Docker security (cloud)
+- 🟡 **[HIGH]** [Microservices] Map service topology and inter-service communication (other)
+- 🟡 **[HIGH]** [Microservices] Check service mesh and sidecar configuration (other)
+- 🟡 **[HIGH]** [Command Injection] Test blind command injection (other)
+- 🟡 **[HIGH]** [Command Injection] Test argument injection vs shell injection (other)
+- 🟡 **[HIGH]** [SSRF] Test SSRF for internal port scanning (ssrf)
+- 🟡 **[HIGH]** [SSRF] Test SSRF for access to internal services (ssrf)
+- 🟡 **[HIGH]** [graphql] Introspection query enabled in production (graphql)
+- 🟡 **[HIGH]** [graphql] GraphiQL accessible without authentication (authentication)
+- 🟡 **[HIGH]** [graphql] Deep query nesting allowing DoS via expensive queries (graphql)
+- 🟡 **[HIGH]** [graphql] Missing authentication on mutation endpoints (authentication)
+- 🟡 **[HIGH]** [graphql] N+1 injection via deeply nested relational queries (graphql)
+- 🟡 **[HIGH]** [graphql] Field suggestion leakage via error messages (graphql)
+- 🟡 **[HIGH]** [graphql] Query batching / aliasing for brute-force attacks (graphql)
+- 🟡 **[HIGH]** [graphql] Circular fragment and recursive fragment DoS (graphql)
+- 🟡 **[HIGH]** [graphql] Inconsistent authorization between queries and mutations (authorization)
+- 🟡 **[HIGH]** [graphql] IDOR in resolver-level data access (graphql)
+- 🟡 **[HIGH]** [graphql] Mass assignment via mutation input types (graphql)
+- 🟡 **[HIGH]** [graphql] Subscription channel without auth (graphql)
+- 🟡 **[HIGH]** [graphql] Schema Disclosure: Check if introspection query is enabled: query { __schema {  (graphql)
+- 🟡 **[HIGH]** [graphql] Information Disclosure: Check if /graphiql or /playground are accessible (graphql)
+- 🟡 **[HIGH]** [graphql] Denial of Service: Test for deep query nesting DoS with 10+ level nested querie (graphql)
+- 🟡 **[HIGH]** [graphql] Authentication: Test mutations without authentication headers (authentication)
+- 🟡 **[HIGH]** [graphql] Business Logic: Test for N+1 injection via deeply nested relational queries (graphql)
+- 🟡 **[HIGH]** [graphql] Information Disclosure: Send invalid field names to check for field suggestions in e (graphql)
+- 🟡 **[HIGH]** [graphql] Rate Limiting: Test query batching with aliases to bypass rate limits (graphql)
+- 🟡 **[HIGH]** [rest] HTTP method overriding allowing auth bypass (other)
+- 🟡 **[HIGH]** [rest] Mass assignment via extra JSON request body fields (other)
+- 🟡 **[HIGH]** [rest] Lack of rate limiting on auth and data endpoints (other)
+- 🟡 **[HIGH]** [rest] Pagination-based data leaks via offset/cursor manipulation (other)
+- 🟡 **[HIGH]** [rest] HATEOAS link manipulation and injection (other)
+- 🟡 **[HIGH]** [rest] Content negotiation bypass via Accept header switching (other)
+- 🟡 **[HIGH]** [rest] Verb tampering to access restricted resources (rce)
+- 🟡 **[HIGH]** [rest] Inconsistent authorization across CRUD operations (authorization)
+- 🟡 **[HIGH]** [rest] OpenAPI/Swagger exposure in production (api)
+- 🟡 **[HIGH]** [rest] Undocumented debug/admin endpoints (other)
+- 🟡 **[HIGH]** [rest] ETag/If-Modified-Since caching manipulation (other)
+- 🟡 **[HIGH]** [rest] API versioning allowing access to deprecated insecure endpoints (api)
+- 🟡 **[HIGH]** [rest] Authentication Bypass: Test HTTP method overriding via X-HTTP-Method-Override, X-HT (authentication)
+- 🟡 **[HIGH]** [rest] Mass Assignment: Send extra JSON fields in POST/PUT/PATCH to test mass assign (other)
+- 🟡 **[HIGH]** [rest] Rate Limiting: Check rate limiting headers (X-RateLimit-*) and bypass attem (other)
+- 🟡 **[HIGH]** [rest] Data Leakage: Manipulate pagination offset/cursor far beyond data range (other)
+- 🟡 **[HIGH]** [rest] Content Negotiation: Switch Accept header between JSON, XML, XHTML, and text/plai (other)
+- 🟡 **[HIGH]** [rest] Information Disclosure: Check for OpenAPI/Swagger documentation endpoints (api)
+- 🟡 **[HIGH]** [rest] Authorization: Test verb tampering: use GET on POST-only endpoints and vice (authorization)
+- 🟡 **[HIGH]** [jwt] alg=none attack allowing arbitrary JWT forgery (other)
+- 🟡 **[HIGH]** [jwt] RS256 to HS256 algorithm confusion using public key (other)
+- 🟡 **[HIGH]** [jwt] Weak HMAC secret brute-force via dictionary attack (rce)
+- 🟡 **[HIGH]** [jwt] kid header injection (path traversal, SQL injection) (other)
+- 🟡 **[HIGH]** [jwt] jku/jwk header SSRF to attacker-controlled endpoints (ssrf)
+- 🟡 **[HIGH]** [jwt] sub claim manipulation for user impersonation (other)
+- 🟡 **[HIGH]** [jwt] Missing expiration (exp) allowing infinite token lifetime (other)
+- 🟡 **[HIGH]** [jwt] Token in URL query string exposed in server logs (other)
+- 🟡 **[HIGH]** [jwt] Hardcoded JWT secret in source code or config files (rce)
+- 🟡 **[HIGH]** [jwt] Missing signature verification in JWT library (other)
+- 🟡 **[HIGH]** [jwt] Token stored in insecure client-side storage (localStorage) (other)
+- 🟡 **[HIGH]** [jwt] Missing audience (aud) or issuer (iss) validation (other)
+- 🟡 **[HIGH]** [jwt] Algorithm Confusion: Test alg=none attack by setting algorithm to none with empty (other)
+- 🟡 **[HIGH]** [jwt] Algorithm Confusion: Test RS256 to HS256 confusion using public key as HMAC secre (other)
+- 🟡 **[HIGH]** [jwt] Weak Secret: Brute-force weak HMAC secret using common password lists (rce)
+- 🟡 **[HIGH]** [jwt] Injection: Test kid header injection with path traversal and SQLi paylo (other)
+- 🟡 **[HIGH]** [jwt] SSRF: Test jku/jwk header by pointing to attacker-controlled URL (ssrf)
+- 🟡 **[HIGH]** [jwt] Authorization: Modify sub claim to impersonate other users (authorization)
+- 🟡 **[HIGH]** [jwt] Token Management: Check if token is transmitted in URL query parameters (other)
+- 🟡 **[HIGH]** [jwt] Token Management: Check for missing expiration (exp) claim in JWT (other)
+- 🟡 **[HIGH]** [oauth] CSRF via missing or weak state parameter in authorization flow (authorization)
+- 🟡 **[HIGH]** [oauth] Open redirect via unvalidated redirect_uri (other)
+- 🟡 **[HIGH]** [oauth] Token leakage via Referrer header on redirect back to client (other)
+- 🟡 **[HIGH]** [oauth] PKCE downgrade from S256 to plain or disabled PKCE (other)
+- 🟡 **[HIGH]** [oauth] Scope escalation by manipulating scope parameter (other)
+- 🟡 **[HIGH]** [oauth] Client secret leakage in source code or URL parameters (rce)
+- 🟡 **[HIGH]** [oauth] Code injection via code parameter tampering (other)
+- 🟡 **[HIGH]** [oauth] Authorization code interception via redirect URI manipulation (authorization)
+- 🟡 **[HIGH]** [oauth] Missing client authentication on token endpoint (authentication)
+- 🟡 **[HIGH]** [oauth] Refresh token rotation bypass (other)
+- 🟡 **[HIGH]** [oauth] Token replay across different client applications (other)
+- 🟡 **[HIGH]** [oauth] Consent screen bypass via auto-approval (other)
+- 🟡 **[HIGH]** [oauth] CSRF: Test for missing or weak state parameter in authorization re (authorization)
+- 🟡 **[HIGH]** [oauth] Open Redirect: Fuzz redirect_uri parameter for open redirect and SSRF (ssrf)
+- 🟡 **[HIGH]** [oauth] Information Disclosure: Check for token in Referrer header after OAuth callback (other)
+- 🟡 **[HIGH]** [oauth] PKCE: Attempt PKCE downgrade by removing code_challenge_method or  (other)
+- 🟡 **[HIGH]** [oauth] Authorization: Test scope escalation by adding privileged scopes to authori (authorization)
+- 🟡 **[HIGH]** [oauth] Information Disclosure: Search for client_secret in source code, configs, and public (rce)
+- 🟡 **[HIGH]** [oauth] Authentication: Test token endpoint for missing client authentication (authentication)
+- 🟡 **[HIGH]** [oauth] Token Management: Test refresh token reuse and check for proper rotation (other)
+- 🟡 **[HIGH]** [oidc] Nonce replay attack via missing or skipped nonce validation (other)
+- 🟡 **[HIGH]** [oidc] acr_values manipulation to downgrade authentication strength (authentication)
+- 🟡 **[HIGH]** [oidc] Audience confusion via missing aud claim validation on ID token (other)
+- 🟡 **[HIGH]** [oidc] Bearer token interception via redirect URI manipulation (rce)
+- 🟡 **[HIGH]** [oidc] Signed vs encrypted hybrid token attacks (JWS/JWE confusion) (other)
+- 🟡 **[HIGH]** [oidc] ID token signature verification bypass (other)
+- 🟡 **[HIGH]** [oidc] Missing iss (issuer) validation allowing token injection from rogue OP (other)
+- 🟡 **[HIGH]** [oidc] Access token reused across different audiences (other)
+- 🟡 **[HIGH]** [oidc] Authorization code injection at token endpoint (authorization)
+- 🟡 **[HIGH]** [oidc] CBC padding oracle attack on JWE encrypted tokens (other)
+- 🟡 **[HIGH]** [oidc] UserInfo endpoint without proper access token validation (other)
+- 🟡 **[HIGH]** [oidc] Session management bypass via id_token_hint injection (session)
+- 🟡 **[HIGH]** [oidc] Authentication: Test nonce replay by reusing an ID token in a new authorizat (authentication)
+- 🟡 **[HIGH]** [oidc] Authentication: Manipulate acr_values to downgrade authentication strength (authentication)
+- 🟡 **[HIGH]** [oidc] Authorization: Test audience confusion by modifying aud claim in ID token (authorization)
+- 🟡 **[HIGH]** [oidc] Information Disclosure: Test redirect URI manipulation for bearer token interception (rce)
+- 🟡 **[HIGH]** [oidc] Cryptography: Test hybrid signed+encrypted token for JWS/JWE parsing confu (other)
+- 🟡 **[HIGH]** [oidc] Authentication: Test issuer validation by swapping ID token iss claim (authentication)
+- 🟡 **[HIGH]** [oidc] Information Disclosure: Test UserInfo endpoint with invalid or missing access token (other)
+- 🟡 **[HIGH]** [oidc] Authorization: Test authorization code injection at token endpoint (authorization)
+- 🟡 **[HIGH]** [saml] XML signature wrapping allowing assertion forgery (other)
+- 🟡 **[HIGH]** [saml] Assertion injection via duplicate element insertion (other)
+- 🟡 **[HIGH]** [saml] Response tampering via unsigned assertion modification (other)
+- 🟡 **[HIGH]** [saml] Issuer spoofing via Issuer element manipulation (other)
+- 🟡 **[HIGH]** [saml] Missing audience restriction enabling cross-SP assertion reuse (other)
+- 🟡 **[HIGH]** [saml] Replay attack via missing NotOnOrAfter condition (other)
+- 🟡 **[HIGH]** [saml] XXE injection in SAML XML documents (other)
+- 🟡 **[HIGH]** [saml] Missing Destination attribute validation on Response (other)
+- 🟡 **[HIGH]** [saml] Weak or missing SubjectConfirmation validation (other)
+- 🟡 **[HIGH]** [saml] XML entity expansion (DoS) via SAML document (other)
+- 🟡 **[HIGH]** [saml] Clock skew exploitation between IdP and SP (other)
+- 🟡 **[HIGH]** [saml] SAML metadata poisoning via fake metadata injection (other)
+- 🟡 **[HIGH]** [saml] XML Signature: Test XML signature wrapping by inserting a duplicate Asserti (other)
+- 🟡 **[HIGH]** [saml] Injection: Inject additional Assertion elements with forged user attrib (other)
+- 🟡 **[HIGH]** [saml] Authorization: Modify attribute values (role, permission, group) in the ass (authorization)
+- 🟡 **[HIGH]** [saml] Authentication: Spoof Issuer element with a trusted IdP entity ID (authentication)
+- 🟡 **[HIGH]** [saml] Authorization: Remove AudienceRestriction or modify to a different SP entit (authorization)
+- 🟡 **[HIGH]** [saml] Replay: Remove NotOnOrAfter condition and replay the SAML response (other)
+- 🟡 **[HIGH]** [saml] XXE: Test XML External Entity injection in SAMLResponse XML (other)
+- 🟡 **[HIGH]** [saml] Authentication: Test SubjectConfirmation method manipulation (bearer vs hold (authentication)
+- 🟡 **[HIGH]** [REST API] Test HTTP parameter pollution (api)
+- 🟡 **[HIGH]** [OAuth] Test redirect URI validation (other)
+- 🟡 **[HIGH]** [OIDC] Test ID token validation (other)
+- 🟡 **[HIGH]** [OIDC] Test claim manipulation (other)
+- 🟡 **[HIGH]** [JWT] Test KID header injection (other)
+- 🟡 **[HIGH]** [JWT] Test JWK/JKU header injection (other)
+- 🟡 **[HIGH]** [Business Logic] Test state transition enforcement (rce)
+- 🟡 **[HIGH]** [Cloud Review] Review serverless function security (cloud)
+- 🟡 **[HIGH]** [Microservices] Test data consistency vulnerabilities (other)
+- 🟡 **[HIGH]** [Command Injection] Escalate to full RCE from command injection (rce)
+- 🟡 **[HIGH]** [Command Injection] Test for command injection filters and bypasses (other)
+- 🟡 **[HIGH]** [SSRF] Test SSRF filter bypasses (ssrf)
+- 🟡 **[HIGH]** [graphql] Knowledge Pack Analysis (api)
+- 🟡 **[HIGH]** [rest] Knowledge Pack Analysis (api)
+- 🟡 **[HIGH]** [GraphQL] Perform full GraphQL introspection (api)
+- 🟡 **[HIGH]** [GraphQL] Test GraphQL batching/resource exhaustion (api)
+- 🟡 **[HIGH]** [GraphQL] Test GraphQL information disclosure via errors (api)
+- 🟡 **[HIGH]** [REST API] Enumerate all API endpoints and resources (api)
+- 🟡 **[HIGH]** [REST API] Test API pagination for data extrusion (api)
+- 🟡 **[HIGH]** [REST API] Test mass assignment/extra fields in API requests (api)
+- 🟡 **[HIGH]** [REST API] Test API rate limiting and resource exhaustion (api)
+- 🟡 **[HIGH]** [OIDC] Test userinfo endpoint security (api)
+- 🟡 **[HIGH]** [GraphQL] Test GraphQL injection in arguments (api)
+- 🟡 **[HIGH]** [Microservices] Test API gateway bypass (api)
+- 🟡 **[HIGH]** [graphql] Workflow 1: 1. Discover GraphQL endpoint via common paths (/graphql, /gr (api)
+- 🟡 **[HIGH]** [graphql] Workflow 2: 2. Test for introspection query: query { __schema { types {  (api)
+- 🟡 **[HIGH]** [graphql] Workflow 3: 3. If introspection disabled, use field fuzzing to discover  (api)
+- 🟡 **[HIGH]** [graphql] Workflow 4: 4. Map all queries, mutations, and subscriptions from the sc (api)
+- 🟡 **[HIGH]** [graphql] Workflow 5: 5. Send deeply nested query to test query depth limits (api)
+- 🟡 **[HIGH]** [graphql] Workflow 6: 6. Test query batching with aliases for brute-force or DoS (api)
+- 🟡 **[HIGH]** [graphql] Workflow 7: 7. Verify authentication on all mutations (send mutation wit (authentication)
+- 🟡 **[HIGH]** [graphql] Workflow 8: 8. Test for N+1 injection via deeply nested list fields (api)
+- 🟡 **[HIGH]** [graphql] Workflow 9: 9. Check error messages for field suggestion leakage (api)
+- 🟡 **[HIGH]** [graphql] Workflow 10: 10. Test circular fragment definitions for parser DoS (api)
+- 🟡 **[HIGH]** [graphql] Workflow 11: 11. Verify authorization consistency across fields (authorization)
+- 🟡 **[HIGH]** [graphql] Workflow 12: 12. Test subscription endpoints for unauthenticated access (api)
+- 🟡 **[HIGH]** [rest] Workflow 1: 1. Discover API endpoints via docs, JS files, or common path (api)
+- 🟡 **[HIGH]** [rest] Workflow 2: 2. Test HTTP method overriding with X-HTTP-Method-Override h (api)
+- 🟡 **[HIGH]** [rest] Workflow 3: 3. Send extra JSON body fields to test mass assignment (api)
+- 🟡 **[HIGH]** [rest] Workflow 4: 4. Check rate limiting headers and attempt brute-force (api)
+- 🟡 **[HIGH]** [rest] Workflow 5: 5. Manipulate pagination parameters to leak data (api)
+- 🟡 **[HIGH]** [rest] Workflow 6: 6. Analyze response hypermedia links for manipulation (api)
+- 🟡 **[HIGH]** [rest] Workflow 7: 7. Switch Accept/Content-Type headers for content negotiatio (api)
+- 🟡 **[HIGH]** [rest] Workflow 8: 8. Test verb tampering across all discovered endpoints (api)
+- 🟡 **[HIGH]** [rest] Workflow 9: 9. Verify consistent authorization across GET/POST/PUT/PATCH (authorization)
+- 🟡 **[HIGH]** [rest] Workflow 10: 10. Check for OpenAPI/Swagger docs exposure (api)
+- 🟡 **[HIGH]** [rest] Workflow 11: 11. Fuzz for internal/debug/admin endpoints (api)
+- 🟡 **[HIGH]** [rest] Workflow 12: 12. Explore older API versions for deprecated vulnerable fun (api)
+- 🟡 **[HIGH]** [File Upload] Test file size and quota limitations (file_upload)
+- 🟡 **[HIGH]** [File Upload] Test stored XSS via file upload (file_upload)
+- 🟡 **[HIGH]** [File Upload] Test path traversal in filename (file_upload)
+- 🟡 **[HIGH]** [File Upload] Test polyglot file attacks (file_upload)
+- 🟡 **[HIGH]** [Race Conditions] Test TOCTOU in file operations (file_upload)
+- 🟡 **[HIGH]** [Cloud Review] Identify cloud provider and exposed storage (cloud)
+- 🟡 **[HIGH]** [SSRF] Test SSRF against cloud metadata services (cloud)
+- 🟡 **[HIGH]** [Cloud Review] Test cloud metadata service access (SSRF to IMDS) (cloud)
+- 🟡 **[HIGH]** [OAuth] Test scope escalation (other)
+- 🟡 **[HIGH]** Privilege Escalation Analysis (other)
+- 🟡 **[HIGH]** Investigation Report Preparation (other)
+
+---
+
+## Suggested Manual Tests
+
+- 🟡 **[HIGH]** Target Reconnaissance
+-   - Perform initial recon: subdomain enumeration, port scanning, technology identification, and director
+- 🟡 **[HIGH]** [Microservices] Test service discovery and registry exposure
+-   - Check service discovery and registry systems for information disclosure and unauthorized access.
+- 🟡 **[HIGH]** [SSRF] Test blind SSRF with OOB techniques
+-   - Detect blind SSRF that returns no data to attacker.
+- 🟡 **[HIGH]** Authentication
+-   - Test authentication mechanisms for bypass, brute force, and session weaknesses
+- 🟡 **[HIGH]** Authorization
+-   - Test access controls for privilege escalation and IDOR
+- 🟡 **[HIGH]** Input Validation
+-   - Test for injection vulnerabilities (SQL, XSS, SSTI, etc.)
+- 🟡 **[HIGH]** Session Management
+-   - Test session handling for fixation, hijacking, and insecure cookies
+- 🟡 **[HIGH]** Configuration
+-   - Test for security misconfiguration and sensitive data exposure
+- 🟡 **[HIGH]** [jwt] Knowledge Pack Analysis
+-   - JWT: alg=none attack, RS256 to HS256 confusion, weak secret brute-force, kid injection, jku header S
+- 🟡 **[HIGH]** [oauth] Knowledge Pack Analysis
+-   - OAuth2: CSRF on redirect URI, state parameter missing, token leakage via referrer, code injection, P
+- 🟡 **[HIGH]** [oidc] Knowledge Pack Analysis
+-   - OIDC (OpenID Connect): nonce replay, acr_values manipulation, audience confusion, bearer token inter
+- 🟡 **[HIGH]** [saml] Knowledge Pack Analysis
+-   - SAML: XML signature wrapping, Assertion injection, response tampering, issuer spoofing, missing audi
+- 🟡 **[HIGH]** [Session Management] Analyze session cookie attributes
+-   - Review session cookie flags and configuration for security weaknesses.
+- 🟡 **[HIGH]** [Session Management] Test session fixation
+-   - Test if session ID remains unchanged after login (session fixation vulnerability).
+- 🟡 **[HIGH]** [Session Management] Test concurrent session handling
+-   - Test how the application handles multiple simultaneous sessions.
+- 🟡 **[HIGH]** [Session Management] Test session termination
+-   - Test logout and session termination completeness.
+- 🟡 **[HIGH]** [Session Management] Test session hijacking via token leakage
+-   - Test for session token leakage through various side channels.
+- 🟡 **[HIGH]** [REST API] Test API authentication bypass
+-   - Test REST API endpoints for missing or weak authentication controls.
+- 🟡 **[HIGH]** [OIDC] Test SSO logout security
+-   - Test OIDC single logout (SLO) and session management for proper termination.
+- 🟡 **[HIGH]** [JWT] Test JWT claim manipulation
+-   - Test modifying JWT claims (sub, role, iat, exp, aud, iss) for authorization bypass.
+- 🟡 **[HIGH]** [JWT] Test JWT token lifecycle
+-   - Test token expiration, refresh token rotation, and token revocation.
+- 🟡 **[HIGH]** [Session Management] Test session token entropy
+-   - Analyze session token randomness for predictability.
+- 🟡 **[HIGH]** [Microservices] Test inter-service authentication
+-   - Test that inter-service communication has proper authentication and does not trust internal requests
+- 🟡 **[HIGH]** [Race Conditions] Test session race conditions and fixation
+-   - Test for race conditions in session handling that can lead to session hijacking or fixation.
+- 🟡 **[HIGH]** [jwt] Workflow 1: 1. Capture a JWT token from the application
+-   - 1. Capture a JWT token from the application
+- 🟡 **[HIGH]** [jwt] Workflow 2: 2. Decode the JWT to inspect header and payload claims
+-   - 2. Decode the JWT to inspect header and payload claims
+- 🟡 **[HIGH]** [jwt] Workflow 3: 3. Test alg=none: modify header to {'alg':'none'} and empty 
+-   - 3. Test alg=none: modify header to {'alg':'none'} and empty signature
+- 🟡 **[HIGH]** [jwt] Workflow 4: 4. Fetch server's public key from /.well-known/jwks.json
+-   - 4. Fetch server's public key from /.well-known/jwks.json
+- 🟡 **[HIGH]** [jwt] Workflow 5: 5. Test RS256->HS256 confusion using public key for HMAC
+-   - 5. Test RS256->HS256 confusion using public key for HMAC
+- 🟡 **[HIGH]** [jwt] Workflow 6: 6. Brute-force weak HMAC secret using jwt_tool or hashcat
+-   - 6. Brute-force weak HMAC secret using jwt_tool or hashcat
+- 🟡 **[HIGH]** [jwt] Workflow 7: 7. Test kid injection with path traversal and SQLi payloads
+-   - 7. Test kid injection with path traversal and SQLi payloads
+- 🟡 **[HIGH]** [jwt] Workflow 8: 8. Set jku/jwk header to attacker-controlled URL for SSRF
+-   - 8. Set jku/jwk header to attacker-controlled URL for SSRF
+- 🟡 **[HIGH]** [jwt] Workflow 9: 9. Modify sub claim to impersonate other users
+-   - 9. Modify sub claim to impersonate other users
+- 🟡 **[HIGH]** [jwt] Workflow 10: 10. Check for presence of exp, nbf, aud, iss claims
+-   - 10. Check for presence of exp, nbf, aud, iss claims
+- 🟡 **[HIGH]** [jwt] Workflow 11: 11. Check if token appears in URL query parameters
+-   - 11. Check if token appears in URL query parameters
+- 🟡 **[HIGH]** [jwt] Workflow 12: 12. Send request with stripped/modified signature
+-   - 12. Send request with stripped/modified signature
+- 🟡 **[HIGH]** [oauth] Workflow 1: 1. Discover OAuth endpoints via /.well-known/oauth-authoriza
+-   - 1. Discover OAuth endpoints via /.well-known/oauth-authorization-server or /.well-known/openid-confi
+- 🟡 **[HIGH]** [oauth] Workflow 2: 2. Identify OAuth flow type (authorization code, implicit, c
+-   - 2. Identify OAuth flow type (authorization code, implicit, client credentials)
+- 🟡 **[HIGH]** [oauth] Workflow 3: 3. Test CSRF by initiating flow without state parameter
+-   - 3. Test CSRF by initiating flow without state parameter
+- 🟡 **[HIGH]** [oauth] Workflow 4: 4. Fuzz redirect_uri with open redirect payloads
+-   - 4. Fuzz redirect_uri with open redirect payloads
+- 🟡 **[HIGH]** [oauth] Workflow 5: 5. Check Referrer header for token leakage after callback
+-   - 5. Check Referrer header for token leakage after callback
+- 🟡 **[HIGH]** [oauth] Workflow 6: 6. Attempt PKCE downgrade by modifying code_challenge_method
+-   - 6. Attempt PKCE downgrade by modifying code_challenge_method
+- 🟡 **[HIGH]** [oauth] Workflow 7: 7. Escalate scope by adding privileged scopes
+-   - 7. Escalate scope by adding privileged scopes
+- 🟡 **[HIGH]** [oauth] Workflow 8: 8. Search for client_secret in source code, config files, an
+-   - 8. Search for client_secret in source code, config files, and public repos
+- 🟡 **[HIGH]** [oauth] Workflow 9: 9. Intercept and modify authorization code during exchange
+-   - 9. Intercept and modify authorization code during exchange
+- 🟡 **[HIGH]** [oauth] Workflow 10: 10. Test token endpoint for missing client authentication
+-   - 10. Test token endpoint for missing client authentication
+- 🟡 **[HIGH]** [oauth] Workflow 11: 11. Test refresh token reuse and rotation
+-   - 11. Test refresh token reuse and rotation
+- 🟡 **[HIGH]** [oauth] Workflow 12: 12. Check for auto-approved consent without user interaction
+-   - 12. Check for auto-approved consent without user interaction
+- 🟡 **[HIGH]** [oidc] Workflow 1: 1. Discover OIDC provider configuration via /.well-known/ope
+-   - 1. Discover OIDC provider configuration via /.well-known/openid-configuration
+- 🟡 **[HIGH]** [oidc] Workflow 2: 2. Identify supported response types, scopes, claims, and ac
+-   - 2. Identify supported response types, scopes, claims, and acr_values
+- 🟡 **[HIGH]** [oidc] Workflow 3: 3. Capture ID token and validate nonce handling/replay prote
+-   - 3. Capture ID token and validate nonce handling/replay protection
+- 🟡 **[HIGH]** [oidc] Workflow 4: 4. Test acr_values manipulation to weaken authentication
+-   - 4. Test acr_values manipulation to weaken authentication
+- 🟡 **[HIGH]** [oidc] Workflow 5: 5. Validate ID token aud, iss, exp, and signature verificati
+-   - 5. Validate ID token aud, iss, exp, and signature verification
+- 🟡 **[HIGH]** [oidc] Workflow 6: 6. Swap aud claim to test audience confusion
+-   - 6. Swap aud claim to test audience confusion
+- 🟡 **[HIGH]** [oidc] Workflow 7: 7. Test bearer token interception through redirect URI fuzzi
+-   - 7. Test bearer token interception through redirect URI fuzzing
+- 🟡 **[HIGH]** [oidc] Workflow 8: 8. Analyze hybrid flow tokens for JWS/JWE confusion attacks
+-   - 8. Analyze hybrid flow tokens for JWS/JWE confusion attacks
+- 🟡 **[HIGH]** [oidc] Workflow 9: 9. Test UserInfo endpoint with stolen or invalid access toke
+-   - 9. Test UserInfo endpoint with stolen or invalid access tokens
+- 🟡 **[HIGH]** [oidc] Workflow 10: 10. Attempt authorization code injection at token endpoint
+-   - 10. Attempt authorization code injection at token endpoint
+- 🟡 **[HIGH]** [oidc] Workflow 11: 11. Test session management via id_token_hint and end_sessio
+-   - 11. Test session management via id_token_hint and end_session endpoint
+- 🟡 **[HIGH]** [oidc] Workflow 12: 12. Check for CBC padding oracle in JWE encrypted tokens
+-   - 12. Check for CBC padding oracle in JWE encrypted tokens
+- 🟡 **[HIGH]** [saml] Workflow 1: 1. Discover SAML endpoints (/saml/acs, /saml/login, /saml/me
+-   - 1. Discover SAML endpoints (/saml/acs, /saml/login, /saml/metadata)
+- 🟡 **[HIGH]** [saml] Workflow 2: 2. Fetch SP/IdP metadata XML from /saml/metadata
+-   - 2. Fetch SP/IdP metadata XML from /saml/metadata
+- 🟡 **[HIGH]** [saml] Workflow 3: 3. Capture a valid SAMLResponse from the ACS endpoint
+-   - 3. Capture a valid SAMLResponse from the ACS endpoint
+- 🟡 **[HIGH]** [saml] Workflow 4: 4. Test XML signature wrapping by inserting duplicate elemen
+-   - 4. Test XML signature wrapping by inserting duplicate elements
+- 🟡 **[HIGH]** [saml] Workflow 5: 5. Inject additional Assertion elements into the response
+-   - 5. Inject additional Assertion elements into the response
+- 🟡 **[HIGH]** [saml] Workflow 6: 6. Modify attribute statements (role, email, uid) in the ass
+-   - 6. Modify attribute statements (role, email, uid) in the assertion
+- 🟡 **[HIGH]** [saml] Workflow 7: 7. Spoof the Issuer element to a different trusted IdP
+-   - 7. Spoof the Issuer element to a different trusted IdP
+- 🟡 **[HIGH]** [saml] Workflow 8: 8. Remove or modify AudienceRestriction for cross-SP use
+-   - 8. Remove or modify AudienceRestriction for cross-SP use
+- 🟡 **[HIGH]** [saml] Workflow 9: 9. Remove NotOnOrAfter condition for replay attack
+-   - 9. Remove NotOnOrAfter condition for replay attack
+- 🟡 **[HIGH]** [saml] Workflow 10: 10. Test XXE injection in SAML XML documents
+-   - 10. Test XXE injection in SAML XML documents
+- 🟡 **[HIGH]** [saml] Workflow 11: 11. Modify Destination attribute in the Response
+-   - 11. Modify Destination attribute in the Response
+- 🟡 **[HIGH]** [saml] Workflow 12: 12. Modify SubjectConfirmation method or data
+-   - 12. Modify SubjectConfirmation method or data
+- 🟡 **[HIGH]** Authorization Testing
+-   - Test role-based access controls: horizontal privilege escalation (same-role resource access), vertic
+- 🟡 **[HIGH]** [GraphQL] Test field-level authorization
+-   - Test GraphQL field-level authorization by directly querying fields that should be restricted.
+- 🟡 **[HIGH]** [GraphQL] Test GraphQL mutation authorization
+-   - Test GraphQL mutations for authorization gaps that allow unauthorized data modification.
+- 🟡 **[HIGH]** [REST API] Test IDOR and authorization on API resources
+-   - Test each API resource for Insecure Direct Object References by manipulating resource IDs.
+- 🟡 **[HIGH]** [OAuth] Test authorization code interception
+-   - Test if authorization codes can be intercepted via referrer leakage, browser history, or logging.
+- 🟡 **[HIGH]** [Cloud Review] Review IAM/cloud permission configuration
+-   - Identify cloud IAM misconfigurations through exposed endpoints and permissions.
+- 🟡 **[HIGH]** [Race Conditions] Test race conditions in authentication and authorization
+-   - Exploit race conditions in login, password reset, and access control.
+- 🟡 **[HIGH]** [Business Logic] Test multi-step workflow bypass
+-   - Test applications with multi-step workflows for step skipping, reordering, and parameter tampering b
+- 🟡 **[HIGH]** [Business Logic] Test privilege tier/role escalation via logic
+-   - Test business logic flaws that allow users to escalate their privileges bypassing intended restricti
+- 🟡 **[HIGH]** [Business Logic] Test mass assignment/parameter manipulation in logic operations
+-   - Test for crucial business logic parameters that can be manipulated via request modification.
+- 🟡 **[HIGH]** [Race Conditions] Identify state-changing operations vulnerable to race conditions
+-   - Find operations that rely on sequential read-write cycles without proper locking or atomicity.
+- 🟡 **[HIGH]** [Business Logic] Test race conditions
+-   - Test for race conditions in state-changing operations (coupon usage, fund transfers, inventory).
+- 🟡 **[HIGH]** [Race Conditions] Test race conditions with concurrent requests
+-   - Send simultaneous overlapping requests to exploit TOCTOU vulnerabilities.
+- 🟡 **[HIGH]** [Race Conditions] Test race conditions in financial operations
+-   - Detect race conditions in money transfers, gift cards, coupons, and inventory.
+- 🟡 **[HIGH]** [JWT] Test algorithm confusion (alg=none)
+-   - Test if JWT library accepts 'none' algorithm or allows attacker-chosen algorithm.
+- 🟡 **[HIGH]** [Microservices] Test distributed tracing exposure
+-   - Check distributed tracing systems (Jaeger, Zipkin, OpenTelemetry) for data exposure.
+- 🟡 **[HIGH]** [Command Injection] Identify command injection entry points
+-   - Find all locations where user input reaches OS command execution functions.
+- 🟡 **[HIGH]** [Command Injection] Test basic command injection with metacharacters
+-   - Test each entry point with shell metacharacters to confirm command injection.
+- 🟡 **[HIGH]** [SSRF] Identify SSRF entry points
+-   - Find all locations where user input controls URL fetching.
+- 🟡 **[HIGH]** [REST API] Test content-type negotiation and deserialization
+-   - Test API content-type handling for deserialization attacks and content-type confusion.
+- 🟡 **[HIGH]** [OAuth] Test CSRF via state parameter
+-   - Test OAuth flow for CSRF protection via state parameter validation.
+- 🟡 **[HIGH]** [OAuth] Test PKCE implementation
+-   - Test Proof Key for Code Exchange (PKCE) implementation for bypasses.
+- 🟡 **[HIGH]** [OAuth] Test token leakage via various channels
+-   - Test for access/refresh token leakage through insecure channels.
+- 🟡 **[HIGH]** [OAuth] Test client credentials grant security
+-   - Test OAuth client credentials grant for insecure client authentication.
+- 🟡 **[HIGH]** [OIDC] Test token confusion (access token vs ID token)
+-   - Test if resource server accepts ID tokens where access tokens are expected.
+- 🟡 **[HIGH]** [JWT] Test RS256 to HS256 key confusion
+-   - Test if server's public key can be used as HMAC secret to forge valid tokens.
+- 🟡 **[HIGH]** [JWT] Test weak HMAC secret brute force
+-   - Brute force the JWT HMAC secret if the token uses a symmetric signing algorithm.
+- 🟡 **[HIGH]** [Session Management] Test CSRF token implementation
+-   - Review CSRF token generation, validation, and session binding.
+- 🟡 **[HIGH]** [File Upload] Test extension validation bypass
+-   - Test all known extension bypass techniques against file upload validation.
+- 🟡 **[HIGH]** [File Upload] Test MIME type/content-type validation
+-   - Test MIME type validation by spoofing Content-Type header.
+- 🟡 **[HIGH]** [Business Logic] Test integer/currency manipulation
+-   - Test for integer overflow, underflow, and currency manipulation in financial operations.
+- 🟡 **[HIGH]** [Business Logic] Test coupon/discount abuse
+-   - Test coupon, discount, and promotional code logic for abuse scenarios.
+- 🟡 **[HIGH]** [Business Logic] Test rate limiting circumvention
+-   - Test rate limiting for bypass via various techniques.
+- 🟡 **[HIGH]** [Cloud Review] Review container/Docker security
+-   - Review container configuration, Dockerfile, and registry exposure.
+- 🟡 **[HIGH]** [Microservices] Map service topology and inter-service communication
+-   - Identify microservice boundaries, service discovery, and communication patterns.
+- 🟡 **[HIGH]** [Microservices] Check service mesh and sidecar configuration
+-   - Review service mesh (Istio, Linkerd) configuration for security gaps.
+- 🟡 **[HIGH]** [Command Injection] Test blind command injection
+-   - Detect command injection that produces no visible output using time-based and OOB techniques.
+- 🟡 **[HIGH]** [Command Injection] Test argument injection vs shell injection
+-   - Distinguish between shell injection (metacharacters work) and argument injection (only args affected
+- 🟡 **[HIGH]** [SSRF] Test SSRF for internal port scanning
+-   - Use SSRF to scan internal network ports and services.
+- 🟡 **[HIGH]** [SSRF] Test SSRF for access to internal services
+-   - Access internal admin panels, APIs, and services via SSRF.
+- 🟡 **[HIGH]** [graphql] Introspection query enabled in production
+-   - Investigate introspection query enabled in production in GraphQL context.
+- 🟡 **[HIGH]** [graphql] GraphiQL accessible without authentication
+-   - Investigate graphiql accessible without authentication in GraphQL context.
+- 🟡 **[HIGH]** [graphql] Deep query nesting allowing DoS via expensive queries
+-   - Investigate deep query nesting allowing dos via expensive queries in GraphQL context.
+- 🟡 **[HIGH]** [graphql] Missing authentication on mutation endpoints
+-   - Investigate missing authentication on mutation endpoints in GraphQL context.
+- 🟡 **[HIGH]** [graphql] N+1 injection via deeply nested relational queries
+-   - Investigate n+1 injection via deeply nested relational queries in GraphQL context.
+- 🟡 **[HIGH]** [graphql] Field suggestion leakage via error messages
+-   - Investigate field suggestion leakage via error messages in GraphQL context.
+- 🟡 **[HIGH]** [graphql] Query batching / aliasing for brute-force attacks
+-   - Investigate query batching / aliasing for brute-force attacks in GraphQL context.
+- 🟡 **[HIGH]** [graphql] Circular fragment and recursive fragment DoS
+-   - Investigate circular fragment and recursive fragment dos in GraphQL context.
+- 🟡 **[HIGH]** [graphql] Inconsistent authorization between queries and mutations
+-   - Investigate inconsistent authorization between queries and mutations in GraphQL context.
+- 🟡 **[HIGH]** [graphql] IDOR in resolver-level data access
+-   - Investigate idor in resolver-level data access in GraphQL context.
+- 🟡 **[HIGH]** [graphql] Mass assignment via mutation input types
+-   - Investigate mass assignment via mutation input types in GraphQL context.
+- 🟡 **[HIGH]** [graphql] Subscription channel without auth
+-   - Investigate subscription channel without auth in GraphQL context.
+- 🟡 **[HIGH]** [graphql] Schema Disclosure: Check if introspection query is enabled: query { __schema { 
+-   - Check if introspection query is enabled: query { __schema { types { name } } }
+- 🟡 **[HIGH]** [graphql] Information Disclosure: Check if /graphiql or /playground are accessible
+-   - Check if /graphiql or /playground are accessible
+- 🟡 **[HIGH]** [graphql] Denial of Service: Test for deep query nesting DoS with 10+ level nested querie
+-   - Test for deep query nesting DoS with 10+ level nested queries
+- 🟡 **[HIGH]** [graphql] Authentication: Test mutations without authentication headers
+-   - Test mutations without authentication headers
+- 🟡 **[HIGH]** [graphql] Business Logic: Test for N+1 injection via deeply nested relational queries
+-   - Test for N+1 injection via deeply nested relational queries
+- 🟡 **[HIGH]** [graphql] Information Disclosure: Send invalid field names to check for field suggestions in e
+-   - Send invalid field names to check for field suggestions in error messages
+- 🟡 **[HIGH]** [graphql] Rate Limiting: Test query batching with aliases to bypass rate limits
+-   - Test query batching with aliases to bypass rate limits
+- 🟡 **[HIGH]** [rest] HTTP method overriding allowing auth bypass
+-   - Investigate http method overriding allowing auth bypass in REST API context.
+- 🟡 **[HIGH]** [rest] Mass assignment via extra JSON request body fields
+-   - Investigate mass assignment via extra json request body fields in REST API context.
+- 🟡 **[HIGH]** [rest] Lack of rate limiting on auth and data endpoints
+-   - Investigate lack of rate limiting on auth and data endpoints in REST API context.
+- 🟡 **[HIGH]** [rest] Pagination-based data leaks via offset/cursor manipulation
+-   - Investigate pagination-based data leaks via offset/cursor manipulation in REST API context.
+- 🟡 **[HIGH]** [rest] HATEOAS link manipulation and injection
+-   - Investigate hateoas link manipulation and injection in REST API context.
+- 🟡 **[HIGH]** [rest] Content negotiation bypass via Accept header switching
+-   - Investigate content negotiation bypass via accept header switching in REST API context.
+- 🟡 **[HIGH]** [rest] Verb tampering to access restricted resources
+-   - Investigate verb tampering to access restricted resources in REST API context.
+- 🟡 **[HIGH]** [rest] Inconsistent authorization across CRUD operations
+-   - Investigate inconsistent authorization across crud operations in REST API context.
+- 🟡 **[HIGH]** [rest] OpenAPI/Swagger exposure in production
+-   - Investigate openapi/swagger exposure in production in REST API context.
+- 🟡 **[HIGH]** [rest] Undocumented debug/admin endpoints
+-   - Investigate undocumented debug/admin endpoints in REST API context.
+- 🟡 **[HIGH]** [rest] ETag/If-Modified-Since caching manipulation
+-   - Investigate etag/if-modified-since caching manipulation in REST API context.
+- 🟡 **[HIGH]** [rest] API versioning allowing access to deprecated insecure endpoints
+-   - Investigate api versioning allowing access to deprecated insecure endpoints in REST API context.
+- 🟡 **[HIGH]** [rest] Authentication Bypass: Test HTTP method overriding via X-HTTP-Method-Override, X-HT
+-   - Test HTTP method overriding via X-HTTP-Method-Override, X-HTTP-Method, X-Method-Override headers
+- 🟡 **[HIGH]** [rest] Mass Assignment: Send extra JSON fields in POST/PUT/PATCH to test mass assign
+-   - Send extra JSON fields in POST/PUT/PATCH to test mass assignment
+- 🟡 **[HIGH]** [rest] Rate Limiting: Check rate limiting headers (X-RateLimit-*) and bypass attem
+-   - Check rate limiting headers (X-RateLimit-*) and bypass attempts
+- 🟡 **[HIGH]** [rest] Data Leakage: Manipulate pagination offset/cursor far beyond data range
+-   - Manipulate pagination offset/cursor far beyond data range
+- 🟡 **[HIGH]** [rest] Content Negotiation: Switch Accept header between JSON, XML, XHTML, and text/plai
+-   - Switch Accept header between JSON, XML, XHTML, and text/plain
+- 🟡 **[HIGH]** [rest] Information Disclosure: Check for OpenAPI/Swagger documentation endpoints
+-   - Check for OpenAPI/Swagger documentation endpoints
+- 🟡 **[HIGH]** [rest] Authorization: Test verb tampering: use GET on POST-only endpoints and vice
+-   - Test verb tampering: use GET on POST-only endpoints and vice versa
+- 🟡 **[HIGH]** [jwt] alg=none attack allowing arbitrary JWT forgery
+-   - Investigate alg=none attack allowing arbitrary jwt forgery in JWT (JSON Web Token) context.
+- 🟡 **[HIGH]** [jwt] RS256 to HS256 algorithm confusion using public key
+-   - Investigate rs256 to hs256 algorithm confusion using public key in JWT (JSON Web Token) context.
+- 🟡 **[HIGH]** [jwt] Weak HMAC secret brute-force via dictionary attack
+-   - Investigate weak hmac secret brute-force via dictionary attack in JWT (JSON Web Token) context.
+- 🟡 **[HIGH]** [jwt] kid header injection (path traversal, SQL injection)
+-   - Investigate kid header injection (path traversal, sql injection) in JWT (JSON Web Token) context.
+- 🟡 **[HIGH]** [jwt] jku/jwk header SSRF to attacker-controlled endpoints
+-   - Investigate jku/jwk header ssrf to attacker-controlled endpoints in JWT (JSON Web Token) context.
+- 🟡 **[HIGH]** [jwt] sub claim manipulation for user impersonation
+-   - Investigate sub claim manipulation for user impersonation in JWT (JSON Web Token) context.
+- 🟡 **[HIGH]** [jwt] Missing expiration (exp) allowing infinite token lifetime
+-   - Investigate missing expiration (exp) allowing infinite token lifetime in JWT (JSON Web Token) contex
+- 🟡 **[HIGH]** [jwt] Token in URL query string exposed in server logs
+-   - Investigate token in url query string exposed in server logs in JWT (JSON Web Token) context.
+- 🟡 **[HIGH]** [jwt] Hardcoded JWT secret in source code or config files
+-   - Investigate hardcoded jwt secret in source code or config files in JWT (JSON Web Token) context.
+- 🟡 **[HIGH]** [jwt] Missing signature verification in JWT library
+-   - Investigate missing signature verification in jwt library in JWT (JSON Web Token) context.
+- 🟡 **[HIGH]** [jwt] Token stored in insecure client-side storage (localStorage)
+-   - Investigate token stored in insecure client-side storage (localstorage) in JWT (JSON Web Token) cont
+- 🟡 **[HIGH]** [jwt] Missing audience (aud) or issuer (iss) validation
+-   - Investigate missing audience (aud) or issuer (iss) validation in JWT (JSON Web Token) context.
+- 🟡 **[HIGH]** [jwt] Algorithm Confusion: Test alg=none attack by setting algorithm to none with empty
+-   - Test alg=none attack by setting algorithm to none with empty signature
+- 🟡 **[HIGH]** [jwt] Algorithm Confusion: Test RS256 to HS256 confusion using public key as HMAC secre
+-   - Test RS256 to HS256 confusion using public key as HMAC secret
+- 🟡 **[HIGH]** [jwt] Weak Secret: Brute-force weak HMAC secret using common password lists
+-   - Brute-force weak HMAC secret using common password lists
+- 🟡 **[HIGH]** [jwt] Injection: Test kid header injection with path traversal and SQLi paylo
+-   - Test kid header injection with path traversal and SQLi payloads
+- 🟡 **[HIGH]** [jwt] SSRF: Test jku/jwk header by pointing to attacker-controlled URL
+-   - Test jku/jwk header by pointing to attacker-controlled URL
+- 🟡 **[HIGH]** [jwt] Authorization: Modify sub claim to impersonate other users
+-   - Modify sub claim to impersonate other users
+- 🟡 **[HIGH]** [jwt] Token Management: Check if token is transmitted in URL query parameters
+-   - Check if token is transmitted in URL query parameters
+- 🟡 **[HIGH]** [jwt] Token Management: Check for missing expiration (exp) claim in JWT
+-   - Check for missing expiration (exp) claim in JWT
+- 🟡 **[HIGH]** [oauth] CSRF via missing or weak state parameter in authorization flow
+-   - Investigate csrf via missing or weak state parameter in authorization flow in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] Open redirect via unvalidated redirect_uri
+-   - Investigate open redirect via unvalidated redirect_uri in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] Token leakage via Referrer header on redirect back to client
+-   - Investigate token leakage via referrer header on redirect back to client in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] PKCE downgrade from S256 to plain or disabled PKCE
+-   - Investigate pkce downgrade from s256 to plain or disabled pkce in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] Scope escalation by manipulating scope parameter
+-   - Investigate scope escalation by manipulating scope parameter in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] Client secret leakage in source code or URL parameters
+-   - Investigate client secret leakage in source code or url parameters in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] Code injection via code parameter tampering
+-   - Investigate code injection via code parameter tampering in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] Authorization code interception via redirect URI manipulation
+-   - Investigate authorization code interception via redirect uri manipulation in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] Missing client authentication on token endpoint
+-   - Investigate missing client authentication on token endpoint in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] Refresh token rotation bypass
+-   - Investigate refresh token rotation bypass in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] Token replay across different client applications
+-   - Investigate token replay across different client applications in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] Consent screen bypass via auto-approval
+-   - Investigate consent screen bypass via auto-approval in OAuth 2.0 context.
+- 🟡 **[HIGH]** [oauth] CSRF: Test for missing or weak state parameter in authorization re
+-   - Test for missing or weak state parameter in authorization request
+- 🟡 **[HIGH]** [oauth] Open Redirect: Fuzz redirect_uri parameter for open redirect and SSRF
+-   - Fuzz redirect_uri parameter for open redirect and SSRF
+- 🟡 **[HIGH]** [oauth] Information Disclosure: Check for token in Referrer header after OAuth callback
+-   - Check for token in Referrer header after OAuth callback
+- 🟡 **[HIGH]** [oauth] PKCE: Attempt PKCE downgrade by removing code_challenge_method or 
+-   - Attempt PKCE downgrade by removing code_challenge_method or changing S256 to plain
+- 🟡 **[HIGH]** [oauth] Authorization: Test scope escalation by adding privileged scopes to authori
+-   - Test scope escalation by adding privileged scopes to authorization request
+- 🟡 **[HIGH]** [oauth] Information Disclosure: Search for client_secret in source code, configs, and public
+-   - Search for client_secret in source code, configs, and public repositories
+- 🟡 **[HIGH]** [oauth] Authentication: Test token endpoint for missing client authentication
+-   - Test token endpoint for missing client authentication
+- 🟡 **[HIGH]** [oauth] Token Management: Test refresh token reuse and check for proper rotation
+-   - Test refresh token reuse and check for proper rotation
+- 🟡 **[HIGH]** [oidc] Nonce replay attack via missing or skipped nonce validation
+-   - Investigate nonce replay attack via missing or skipped nonce validation in OpenID Connect (OIDC) con
+- 🟡 **[HIGH]** [oidc] acr_values manipulation to downgrade authentication strength
+-   - Investigate acr_values manipulation to downgrade authentication strength in OpenID Connect (OIDC) co
+- 🟡 **[HIGH]** [oidc] Audience confusion via missing aud claim validation on ID token
+-   - Investigate audience confusion via missing aud claim validation on id token in OpenID Connect (OIDC)
+- 🟡 **[HIGH]** [oidc] Bearer token interception via redirect URI manipulation
+-   - Investigate bearer token interception via redirect uri manipulation in OpenID Connect (OIDC) context
+- 🟡 **[HIGH]** [oidc] Signed vs encrypted hybrid token attacks (JWS/JWE confusion)
+-   - Investigate signed vs encrypted hybrid token attacks (jws/jwe confusion) in OpenID Connect (OIDC) co
+- 🟡 **[HIGH]** [oidc] ID token signature verification bypass
+-   - Investigate id token signature verification bypass in OpenID Connect (OIDC) context.
+- 🟡 **[HIGH]** [oidc] Missing iss (issuer) validation allowing token injection from rogue OP
+-   - Investigate missing iss (issuer) validation allowing token injection from rogue op in OpenID Connect
+- 🟡 **[HIGH]** [oidc] Access token reused across different audiences
+-   - Investigate access token reused across different audiences in OpenID Connect (OIDC) context.
+- 🟡 **[HIGH]** [oidc] Authorization code injection at token endpoint
+-   - Investigate authorization code injection at token endpoint in OpenID Connect (OIDC) context.
+- 🟡 **[HIGH]** [oidc] CBC padding oracle attack on JWE encrypted tokens
+-   - Investigate cbc padding oracle attack on jwe encrypted tokens in OpenID Connect (OIDC) context.
+- 🟡 **[HIGH]** [oidc] UserInfo endpoint without proper access token validation
+-   - Investigate userinfo endpoint without proper access token validation in OpenID Connect (OIDC) contex
+- 🟡 **[HIGH]** [oidc] Session management bypass via id_token_hint injection
+-   - Investigate session management bypass via id_token_hint injection in OpenID Connect (OIDC) context.
+- 🟡 **[HIGH]** [oidc] Authentication: Test nonce replay by reusing an ID token in a new authorizat
+-   - Test nonce replay by reusing an ID token in a new authorization request
+- 🟡 **[HIGH]** [oidc] Authentication: Manipulate acr_values to downgrade authentication strength
+-   - Manipulate acr_values to downgrade authentication strength
+- 🟡 **[HIGH]** [oidc] Authorization: Test audience confusion by modifying aud claim in ID token
+-   - Test audience confusion by modifying aud claim in ID token
+- 🟡 **[HIGH]** [oidc] Information Disclosure: Test redirect URI manipulation for bearer token interception
+-   - Test redirect URI manipulation for bearer token interception
+- 🟡 **[HIGH]** [oidc] Cryptography: Test hybrid signed+encrypted token for JWS/JWE parsing confu
+-   - Test hybrid signed+encrypted token for JWS/JWE parsing confusion
+- 🟡 **[HIGH]** [oidc] Authentication: Test issuer validation by swapping ID token iss claim
+-   - Test issuer validation by swapping ID token iss claim
+- 🟡 **[HIGH]** [oidc] Information Disclosure: Test UserInfo endpoint with invalid or missing access token
+-   - Test UserInfo endpoint with invalid or missing access token
+- 🟡 **[HIGH]** [oidc] Authorization: Test authorization code injection at token endpoint
+-   - Test authorization code injection at token endpoint
+- 🟡 **[HIGH]** [saml] XML signature wrapping allowing assertion forgery
+-   - Investigate xml signature wrapping allowing assertion forgery in SAML (Security Assertion Markup Lan
+- 🟡 **[HIGH]** [saml] Assertion injection via duplicate element insertion
+-   - Investigate assertion injection via duplicate element insertion in SAML (Security Assertion Markup L
+- 🟡 **[HIGH]** [saml] Response tampering via unsigned assertion modification
+-   - Investigate response tampering via unsigned assertion modification in SAML (Security Assertion Marku
+- 🟡 **[HIGH]** [saml] Issuer spoofing via Issuer element manipulation
+-   - Investigate issuer spoofing via issuer element manipulation in SAML (Security Assertion Markup Langu
+- 🟡 **[HIGH]** [saml] Missing audience restriction enabling cross-SP assertion reuse
+-   - Investigate missing audience restriction enabling cross-sp assertion reuse in SAML (Security Asserti
+- 🟡 **[HIGH]** [saml] Replay attack via missing NotOnOrAfter condition
+-   - Investigate replay attack via missing notonorafter condition in SAML (Security Assertion Markup Lang
+- 🟡 **[HIGH]** [saml] XXE injection in SAML XML documents
+-   - Investigate xxe injection in saml xml documents in SAML (Security Assertion Markup Language) context
+- 🟡 **[HIGH]** [saml] Missing Destination attribute validation on Response
+-   - Investigate missing destination attribute validation on response in SAML (Security Assertion Markup 
+- 🟡 **[HIGH]** [saml] Weak or missing SubjectConfirmation validation
+-   - Investigate weak or missing subjectconfirmation validation in SAML (Security Assertion Markup Langua
+- 🟡 **[HIGH]** [saml] XML entity expansion (DoS) via SAML document
+-   - Investigate xml entity expansion (dos) via saml document in SAML (Security Assertion Markup Language
+- 🟡 **[HIGH]** [saml] Clock skew exploitation between IdP and SP
+-   - Investigate clock skew exploitation between idp and sp in SAML (Security Assertion Markup Language) 
+- 🟡 **[HIGH]** [saml] SAML metadata poisoning via fake metadata injection
+-   - Investigate saml metadata poisoning via fake metadata injection in SAML (Security Assertion Markup L
+- 🟡 **[HIGH]** [saml] XML Signature: Test XML signature wrapping by inserting a duplicate Asserti
+-   - Test XML signature wrapping by inserting a duplicate Assertion outside the signature
+- 🟡 **[HIGH]** [saml] Injection: Inject additional Assertion elements with forged user attrib
+-   - Inject additional Assertion elements with forged user attributes
+- 🟡 **[HIGH]** [saml] Authorization: Modify attribute values (role, permission, group) in the ass
+-   - Modify attribute values (role, permission, group) in the assertion
+- 🟡 **[HIGH]** [saml] Authentication: Spoof Issuer element with a trusted IdP entity ID
+-   - Spoof Issuer element with a trusted IdP entity ID
+- 🟡 **[HIGH]** [saml] Authorization: Remove AudienceRestriction or modify to a different SP entit
+-   - Remove AudienceRestriction or modify to a different SP entity ID
+- 🟡 **[HIGH]** [saml] Replay: Remove NotOnOrAfter condition and replay the SAML response
+-   - Remove NotOnOrAfter condition and replay the SAML response
+- 🟡 **[HIGH]** [saml] XXE: Test XML External Entity injection in SAMLResponse XML
+-   - Test XML External Entity injection in SAMLResponse XML
+- 🟡 **[HIGH]** [saml] Authentication: Test SubjectConfirmation method manipulation (bearer vs hold
+-   - Test SubjectConfirmation method manipulation (bearer vs holder-of-key)
+- 🟡 **[HIGH]** [REST API] Test HTTP parameter pollution
+-   - Test for parameter pollution via duplicate parameters, different content-types, and HTTP parameter s
+- 🟡 **[HIGH]** [OAuth] Test redirect URI validation
+-   - Test OAuth redirect URIs for open redirect and validation bypass.
+- 🟡 **[HIGH]** [OIDC] Test ID token validation
+-   - Test OpenID Connect ID token validation for signature verification, expiry, and issuer checks.
+- 🟡 **[HIGH]** [OIDC] Test claim manipulation
+-   - Test for OIDC claim manipulation to escalate privileges or impersonate users.
+- 🟡 **[HIGH]** [JWT] Test KID header injection
+-   - Test JWT Key ID (kid) header for injection vulnerabilities (SQLi, path traversal, command injection)
+- 🟡 **[HIGH]** [JWT] Test JWK/JKU header injection
+-   - Test if JWT library accepts embedded JWK (jwk header) or JWK Set URL (jku header) for key retrieval.
+- 🟡 **[HIGH]** [Business Logic] Test state transition enforcement
+-   - Test that application state transitions are properly enforced server-side.
+- 🟡 **[HIGH]** [Cloud Review] Review serverless function security
+-   - Review cloud serverless function configuration for event injection, timeout abuse, and dependency vu
+- 🟡 **[HIGH]** [Microservices] Test data consistency vulnerabilities
+-   - Test for business logic flaws in data consistency between services (eventual consistency exploits).
+- 🟡 **[HIGH]** [Command Injection] Escalate to full RCE from command injection
+-   - Convert basic command injection to a fully interactive shell with proper TTY.
+- 🟡 **[HIGH]** [Command Injection] Test for command injection filters and bypasses
+-   - Test various filter bypasses when basic injection is blocked.
+- 🟡 **[HIGH]** [SSRF] Test SSRF filter bypasses
+-   - Bypass common SSRF protections including allowlists, blocklists, and URL parsing.
+- 🟡 **[HIGH]** [graphql] Knowledge Pack Analysis
+-   - GraphQL API: introspection query, batching attacks, deep query nesting DoS, missing auth on mutation
+- 🟡 **[HIGH]** [rest] Knowledge Pack Analysis
+-   - REST API: HTTP method overriding, mass assignment, lack of rate limiting, pagination-based data leak
+- 🟡 **[HIGH]** [GraphQL] Perform full GraphQL introspection
+-   - Query GraphQL schema introspection to discover all types, queries, mutations, subscriptions, and fie
+- 🟡 **[HIGH]** [GraphQL] Test GraphQL batching/resource exhaustion
+-   - Test for GraphQL batching (batched queries) and depth-based denial of service.
+- 🟡 **[HIGH]** [GraphQL] Test GraphQL information disclosure via errors
+-   - Analyze GraphQL error messages for stack traces, database details, and schema information.
+- 🟡 **[HIGH]** [REST API] Enumerate all API endpoints and resources
+-   - Discover and enumerate all REST API endpoints through documentation, crawling, and pattern-guessing.
+- 🟡 **[HIGH]** [REST API] Test API pagination for data extrusion
+-   - Test API pagination to determine if it can be abused for mass data extraction.
+- 🟡 **[HIGH]** [REST API] Test mass assignment/extra fields in API requests
+-   - Test API endpoints that accept JSON/XML bodies for accepting unexpected properties.
+- 🟡 **[HIGH]** [REST API] Test API rate limiting and resource exhaustion
+-   - Test API endpoint rate limiting, pagination abuse, and resource exhaustion protection.
+- 🟡 **[HIGH]** [OIDC] Test userinfo endpoint security
+-   - Test OIDC userinfo endpoint for proper authentication and data access controls.
+- 🟡 **[HIGH]** [GraphQL] Test GraphQL injection in arguments
+-   - Test for injection vulnerabilities through GraphQL arguments.
+- 🟡 **[HIGH]** [Microservices] Test API gateway bypass
+-   - Test for direct service access bypassing the API gateway.
+- 🟡 **[HIGH]** [graphql] Workflow 1: 1. Discover GraphQL endpoint via common paths (/graphql, /gr
+-   - 1. Discover GraphQL endpoint via common paths (/graphql, /graphiql, /playground)
+- 🟡 **[HIGH]** [graphql] Workflow 2: 2. Test for introspection query: query { __schema { types { 
+-   - 2. Test for introspection query: query { __schema { types { name } } }
+- 🟡 **[HIGH]** [graphql] Workflow 3: 3. If introspection disabled, use field fuzzing to discover 
+-   - 3. If introspection disabled, use field fuzzing to discover fields and types
+- 🟡 **[HIGH]** [graphql] Workflow 4: 4. Map all queries, mutations, and subscriptions from the sc
+-   - 4. Map all queries, mutations, and subscriptions from the schema
+- 🟡 **[HIGH]** [graphql] Workflow 5: 5. Send deeply nested query to test query depth limits
+-   - 5. Send deeply nested query to test query depth limits
+- 🟡 **[HIGH]** [graphql] Workflow 6: 6. Test query batching with aliases for brute-force or DoS
+-   - 6. Test query batching with aliases for brute-force or DoS
+- 🟡 **[HIGH]** [graphql] Workflow 7: 7. Verify authentication on all mutations (send mutation wit
+-   - 7. Verify authentication on all mutations (send mutation without auth)
+- 🟡 **[HIGH]** [graphql] Workflow 8: 8. Test for N+1 injection via deeply nested list fields
+-   - 8. Test for N+1 injection via deeply nested list fields
+- 🟡 **[HIGH]** [graphql] Workflow 9: 9. Check error messages for field suggestion leakage
+-   - 9. Check error messages for field suggestion leakage
+- 🟡 **[HIGH]** [graphql] Workflow 10: 10. Test circular fragment definitions for parser DoS
+-   - 10. Test circular fragment definitions for parser DoS
+- 🟡 **[HIGH]** [graphql] Workflow 11: 11. Verify authorization consistency across fields
+-   - 11. Verify authorization consistency across fields
+- 🟡 **[HIGH]** [graphql] Workflow 12: 12. Test subscription endpoints for unauthenticated access
+-   - 12. Test subscription endpoints for unauthenticated access
+- 🟡 **[HIGH]** [rest] Workflow 1: 1. Discover API endpoints via docs, JS files, or common path
+-   - 1. Discover API endpoints via docs, JS files, or common paths
+- 🟡 **[HIGH]** [rest] Workflow 2: 2. Test HTTP method overriding with X-HTTP-Method-Override h
+-   - 2. Test HTTP method overriding with X-HTTP-Method-Override header
+- 🟡 **[HIGH]** [rest] Workflow 3: 3. Send extra JSON body fields to test mass assignment
+-   - 3. Send extra JSON body fields to test mass assignment
+- 🟡 **[HIGH]** [rest] Workflow 4: 4. Check rate limiting headers and attempt brute-force
+-   - 4. Check rate limiting headers and attempt brute-force
+- 🟡 **[HIGH]** [rest] Workflow 5: 5. Manipulate pagination parameters to leak data
+-   - 5. Manipulate pagination parameters to leak data
+- 🟡 **[HIGH]** [rest] Workflow 6: 6. Analyze response hypermedia links for manipulation
+-   - 6. Analyze response hypermedia links for manipulation
+- 🟡 **[HIGH]** [rest] Workflow 7: 7. Switch Accept/Content-Type headers for content negotiatio
+-   - 7. Switch Accept/Content-Type headers for content negotiation bypass
+- 🟡 **[HIGH]** [rest] Workflow 8: 8. Test verb tampering across all discovered endpoints
+-   - 8. Test verb tampering across all discovered endpoints
+- 🟡 **[HIGH]** [rest] Workflow 9: 9. Verify consistent authorization across GET/POST/PUT/PATCH
+-   - 9. Verify consistent authorization across GET/POST/PUT/PATCH/DELETE
+- 🟡 **[HIGH]** [rest] Workflow 10: 10. Check for OpenAPI/Swagger docs exposure
+-   - 10. Check for OpenAPI/Swagger docs exposure
+- 🟡 **[HIGH]** [rest] Workflow 11: 11. Fuzz for internal/debug/admin endpoints
+-   - 11. Fuzz for internal/debug/admin endpoints
+- 🟡 **[HIGH]** [rest] Workflow 12: 12. Explore older API versions for deprecated vulnerable fun
+-   - 12. Explore older API versions for deprecated vulnerable functionality
+- 🟡 **[HIGH]** [File Upload] Test file size and quota limitations
+-   - Test file upload size limits, quota enforcement, and disk exhaustion.
+- 🟡 **[HIGH]** [File Upload] Test stored XSS via file upload
+-   - Test for stored cross-site scripting via uploaded files.
+- 🟡 **[HIGH]** [File Upload] Test path traversal in filename
+-   - Test filename path traversal to write files outside the intended directory.
+- 🟡 **[HIGH]** [File Upload] Test polyglot file attacks
+-   - Test polyglot files that pass validation but execute as different format.
+- 🟡 **[HIGH]** [Race Conditions] Test TOCTOU in file operations
+-   - Find time-of-check to time-of-use vulnerabilities in file operations.
+- 🟡 **[HIGH]** [Cloud Review] Identify cloud provider and exposed storage
+-   - Identify cloud provider from DNS, headers, and check for exposed storage buckets/containers.
+- 🟡 **[HIGH]** [SSRF] Test SSRF against cloud metadata services
+-   - Probe for access to cloud provider metadata endpoints.
+- 🟡 **[HIGH]** [Cloud Review] Test cloud metadata service access (SSRF to IMDS)
+-   - Test for Server-Side Request Forgery that can access cloud instance metadata service to steal creden
+- 🟡 **[HIGH]** [OAuth] Test scope escalation
+-   - Test for OAuth scope escalation by requesting higher privilege scopes.
+- 🟡 **[HIGH]** Privilege Escalation Analysis
+-   - Analyze for privilege escalation vectors: insecure direct object references, role manipulation, forc
+- 🟡 **[HIGH]** Investigation Report Preparation
+-   - Compile findings, evidence, screenshots, and reproduction steps into a structured security assessmen
+
+---
+
+*Report generated by DeepHunter on 2026-07-01T18:52:29.782016+00:00*

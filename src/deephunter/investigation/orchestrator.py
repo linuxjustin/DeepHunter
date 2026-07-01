@@ -607,10 +607,15 @@ class InvestigationOrchestrator:
                     results["errors"].append(f"{tool_name}: {health.errors or 'not installed'}")
                     continue
 
+                from deephunter.tools.config import ToolPluginConfig
+                cfg = ToolPluginConfig()
+                cfg.plugin_timeouts = {tool_name: timeout}
+
                 ctx = ExecutionContext(
                     target=domain,
+                    plugin_name=tool_name,
                     args={"domain": domain},
-                    timeout=timeout,
+                    config=cfg,
                 )
 
                 try:
@@ -631,9 +636,9 @@ class InvestigationOrchestrator:
     ) -> dict[str, Any]:
         """Run subdomain enumeration tools (subfinder, assetfinder, amass)."""
         from deephunter.tools.registry import ToolPluginRegistry
-        from deephunter.tools.executor import ToolExecutor
         from deephunter.tools.context import ExecutionContext
         from deephunter.tools.events import ToolEventBus
+        from deephunter.investigation.models import ScopeEntry, ScopeEntryType
 
         config = step.config or {}
         tools = config.get("tools", ["subfinder"])
@@ -642,7 +647,6 @@ class InvestigationOrchestrator:
         event_bus = ToolEventBus()
         registry = ToolPluginRegistry(event_bus=event_bus)
         registry.discover()
-        executor = ToolExecutor(event_bus=event_bus)
 
         all_hosts: list[str] = []
         errors: list[str] = []
@@ -664,22 +668,42 @@ class InvestigationOrchestrator:
                     errors.append(f"{tool_name}: not installed")
                     continue
 
+                from deephunter.tools.config import ToolPluginConfig
+                cfg = ToolPluginConfig()
+                cfg.plugin_timeouts = {tool_name: timeout}
+
                 ctx = ExecutionContext(
                     target=domain,
+                    plugin_name=tool_name,
                     args={"domain": domain},
-                    timeout=timeout,
+                    config=cfg,
                 )
 
                 try:
-                    report = executor.execute(plugin, ctx)
-                    if report.status.value == "success" and report.parsed_count > 0:
-                        all_hosts.append(f"{tool_name}: {report.parsed_count} subdomains")
+                    raw_output = plugin.execute(ctx)
+                    parsed = plugin.parse_output(raw_output, ctx)
+                    result = plugin.normalize(parsed, ctx)
+
+                    for host in result.hosts:
+                        hostname = getattr(host, 'hostname', str(host))
+                        if hostname and hostname not in all_hosts:
+                            all_hosts.append(hostname)
                 except Exception as exc:
                     errors.append(f"{tool_name}: {str(exc)}")
 
+        new_entries = 0
+        for hostname in all_hosts:
+            state.scope.entries.append(ScopeEntry(
+                value=hostname,
+                entry_type=ScopeEntryType.IN_SCOPE,
+                source="subdomain_enum",
+            ))
+            new_entries += 1
+
         return {
             "subdomains_found": len(all_hosts),
-            "tools_used": all_hosts,
+            "new_scope_entries": new_entries,
+            "tools_used": [f"{t}: found {len(all_hosts)}" for t in tools if registry.get(t)],
             "errors": errors,
         }
 
@@ -723,22 +747,32 @@ class InvestigationOrchestrator:
                     errors.append(f"{tool_name}: not installed")
                     continue
 
+                from deephunter.tools.config import ToolPluginConfig
+                cfg = ToolPluginConfig()
+                cfg.plugin_timeouts = {tool_name: timeout}
+
                 ctx = ExecutionContext(
                     target=url,
+                    plugin_name=tool_name,
                     args={"url": url},
-                    timeout=timeout,
+                    config=cfg,
                 )
 
                 try:
-                    report = executor.execute(plugin, ctx)
-                    if report.status.value == "success":
-                        endpoints_found.append(f"{tool_name}: {report.parsed_count} endpoints")
+                    raw_output = plugin.execute(ctx)
+                    parsed = plugin.parse_output(raw_output, ctx)
+                    result = plugin.normalize(parsed, ctx)
+
+                    for endpoint in result.endpoints:
+                        endpoint_str = getattr(endpoint, 'url', str(endpoint))
+                        if endpoint_str and endpoint_str not in endpoints_found:
+                            endpoints_found.append(endpoint_str)
                 except Exception as exc:
                     errors.append(f"{tool_name}: {str(exc)}")
 
         return {
             "endpoints_found": len(endpoints_found),
-            "tools_used": endpoints_found,
+            "tools_used": [f"{t}: found {len(endpoints_found)}" for t in tools if registry.get(t)],
             "errors": errors,
         }
 
@@ -1058,7 +1092,7 @@ class InvestigationOrchestrator:
         self, state: InvestigationSessionState, step: WorkflowStepDefinition
     ) -> dict[str, Any]:
         """Display investigation summary and await researcher confirmation."""
-        from deephunter.investigation.profiles import get_profile
+        from deephunter.investigation.profile_registry import get_profile
 
         profile_name = state.checkpoint_data.get("profile_name", "bugbounty")
         profile = get_profile(profile_name) if profile_name else None
